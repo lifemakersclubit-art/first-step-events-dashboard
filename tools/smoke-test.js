@@ -275,20 +275,28 @@ function connect(wsUrl) {
       return r.result.value;
     };
 
+    /* "Ready" is two independent requests: rows paints the numbers, facets
+       fills the filter dropdowns. Wait for BOTH or later assertions race the
+       slower one. */
+    const FULL_READY = `(function(){
+      var h = document.querySelector('#heroTotal');
+      if (!h) return false;
+      if (!document.body.classList.contains('ready')) return false;
+      if (!h.textContent || h.textContent === 'جاري التحميل…') return false;
+      var sel = document.querySelector('#dFilterEvent');
+      if (!sel || sel.options.length < 2 || sel.disabled) return false;
+      var err = document.querySelector('#errorState');
+      if (err && !err.hidden) return 'error';
+      return true;
+    })()`;
+
     pageLoads++; await cdp.send('Page.navigate', { url: 'http://127.0.0.1:' + PORT + '/index.html' });
 
     console.log('1. boot');
-    const booted = await waitFor(() => evaluate(`(function(){
-      var h = document.querySelector('#heroTotal');
-      if (!h) return false;
-      if (document.body.classList.contains('ready') && h.textContent && h.textContent !== 'جاري التحميل…') return true;
-      var err = document.querySelector('#errorState');
-      if (err && !err.hidden) return 'error';
-      return false;
-    })()`), 45000, 'dashboard ready').catch(e => 'TIMEOUT:' + e.message);
+    const booted = await waitFor(() => evaluate(FULL_READY), 45000, 'dashboard ready').catch(e => 'TIMEOUT:' + e.message);
 
     if (booted === 'error') { check('dashboard reaches the ready state', false, 'showed the error state'); }
-    else check('dashboard reaches the ready state', booted === true || String(booted).indexOf('TIMEOUT') === 0, booted);
+    else check('dashboard reaches the ready state (numbers + filter options)', booted === true || String(booted).indexOf('TIMEOUT') === 0, booted);
 
     const snap = await evaluate(`(function(){
       var t = function(s){ var e=document.querySelector(s); return e ? e.textContent.trim() : null; };
@@ -446,10 +454,7 @@ function connect(wsUrl) {
 
     /* A stale ?university= deep link must be ignored, not break the page. */
     pageLoads++; await cdp.send('Page.navigate', { url: 'http://127.0.0.1:' + PORT + '/index.html?university=' + encodeURIComponent('جامعة القاهرة') });
-    await waitFor(() => evaluate(`(function(){
-      var h=document.querySelector('#heroTotal');
-      return document.body.classList.contains('ready') && h && h.textContent && h.textContent!=='جاري التحميل…';
-    })()`), 45000, 'stale-university deep link ready').catch(() => {});
+    await waitFor(() => evaluate(FULL_READY), 45000, 'stale-university deep link ready').catch(() => {});
     const staleUni = await evaluate(`(function(){
       return { url: location.search, hero: document.querySelector('#heroTotal').textContent.trim(),
                events: document.querySelectorAll('#eventList .activity-item').length };
@@ -457,10 +462,7 @@ function connect(wsUrl) {
     check('a stale ?university= link is ignored (full dataset shown)', staleUni.events === 4, staleUni.events);
     check('a stale ?university= link leaves the URL clean', !/university=/.test(staleUni.url), staleUni.url);
     pageLoads++; await cdp.send('Page.navigate', { url: 'http://127.0.0.1:' + PORT + '/index.html' });
-    await waitFor(() => evaluate(`(function(){
-      var h=document.querySelector('#heroTotal');
-      return document.body.classList.contains('ready') && h && h.textContent && h.textContent!=='جاري التحميل…';
-    })()`), 45000, 'dashboard restored').catch(() => {});
+    await waitFor(() => evaluate(FULL_READY), 45000, 'dashboard restored').catch(() => {});
 
     /* every filter must actually narrow the data when selected */
     const eachFilter = await evaluate(`(function(){
@@ -543,10 +545,7 @@ function connect(wsUrl) {
 
     console.log('\n7. deep link + reset');
     pageLoads++; await cdp.send('Page.navigate', { url: 'http://127.0.0.1:' + PORT + '/index.html?event=' + encodeURIComponent(EVENTS[0]) });
-    await waitFor(() => evaluate(`(function(){
-      var h = document.querySelector('#heroTotal');
-      return document.body.classList.contains('ready') && h && h.textContent && h.textContent!=='جاري التحميل…';
-    })()`), 45000, 'deep-linked dashboard ready').catch(() => {});
+    await waitFor(() => evaluate(FULL_READY), 45000, 'deep-linked dashboard ready').catch(() => {});
     const deep = await evaluate(`(function(){
       return { sel: document.querySelector('#dFilterEvent').value, hero: document.querySelector('#heroTotal').textContent.trim(),
                events: document.querySelectorAll('#eventList .activity-item').length,
