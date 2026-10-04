@@ -43,14 +43,6 @@
   margin-top: 6px;
 }
 
-.splash__line {
-  color: var(--orange-deep);
-  font-weight: 800;
-  font-size: clamp(1.15rem, 3vw, 1.55rem);
-  letter-spacing: 0.02em;
-  margin-top: 10px;
-}
-
 .splash__fest {
   margin-top: 14px;
   font-size: 0.72rem;

@@ -556,6 +556,31 @@ function connect(wsUrl) {
     check('deep-linked view is narrowed to that event', deep.events === 1, deep.events);
     check('the hint paragraph (not a <select>) shows the filter summary', /عرض/.test(deep.hint || ''), deep.hint);
 
+    console.log('\n7b. branding');
+    const brand = await evaluate(`(function(){
+      var splash = document.getElementById('splash');
+      return {
+        splashText: splash ? splash.textContent.replace(/\\s+/g,' ').trim() : null,
+        title: document.title,
+        description: (document.querySelector('meta[name="description"]')||{}).content,
+        heroWord: (document.querySelector('.hero__word')||{}).textContent,
+        headerWord: (document.querySelector('.brand__word')||{}).textContent
+      };
+    })()`);
+    /* The event name must only ever appear in Latin script. An Arabic
+       transliteration slipped into the splash once already. */
+    check('no Arabic transliteration of the event name anywhere in the page',
+      !/فيرست ستيب/.test(JSON.stringify(brand)), brand.splashText);
+    check('splash shows the org name in Arabic',
+      /صناع الحياة بالجامعات المصرية/.test(brand.splashText || ''), brand.splashText);
+    check('splash shows the event name in Latin script',
+      /FIRST STEP EVENTS/.test(brand.splashText || ''), brand.splashText);
+    check('splash has exactly two text lines', (brand.splashText || '').split(' ').length > 0 && !/إيفنتس/.test(brand.splashText || ''), brand.splashText);
+    check('meta description carries no Arabic transliteration',
+      !/فيرست ستيب/.test(brand.description || ''), brand.description);
+    check('hero wordmark is Latin script', /FIRST STEP/.test((brand.heroWord || '').replace(/\s+/g, ' ')), brand.heroWord);
+    check('header wordmark is Latin script', /FIRST STEP EVENTS/.test((brand.headerWord || '').trim()), brand.headerWord);
+
     const afterReset = await evaluate(`(function(){
       document.querySelector('#dFilterReset').click();
       return new Promise(function(res){
