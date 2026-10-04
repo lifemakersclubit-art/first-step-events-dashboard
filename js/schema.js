@@ -263,11 +263,40 @@ const Schema = (function () {
   }
 
   /* ------------------------------------------------------------------
-     Geography derivation (no dedicated Governorate column in the sheet)
+     Geography derivation.
+     GEO_RULES mirrors GEO_RULES in google-apps-script/Code.gs — kept local so
+     this file is self-contained and needs no global CONFIG.
      ------------------------------------------------------------------ */
+  const GEO_RULES = [
+    { gov: "القاهرة", uni: "جامعة الأزهر", keys: ["الازهر بالقاهره", "الازهر", "جامعة الازهر"] },
+    { gov: "القاهرة", uni: "جامعة القاهرة", keys: ["جامعة القاهره", "القاهره"] },
+    { gov: "الدقهلية", uni: "جامعة المنصورة", keys: ["المنصوره", "جامعة المنصوره"] },
+    { gov: "البحيرة", uni: "جامعة بنها", keys: ["بنها", "جامعة بنها"] },
+    { gov: "قنا", uni: "جامعة قنا", keys: ["قنا", "جامعة قنا"] },
+    { gov: "الشرقية", uni: "جامعة الزقازيق", keys: ["الزقازيق", "زقازيق", "الشرقيه"] },
+    { gov: "الغربية", uni: "جامعة طنطا", keys: ["طنطا", "جامعة طنطا", "الغربيه"] },
+    { gov: "القليوبية", uni: "جامعة بنها فرع بنها", keys: ["بنها فرع بنها", "قليوبيه"] },
+    { gov: "أسيوط", uni: "جامعة أسيوط", keys: ["اسيوط", "جامعة اسيوط"] },
+    { gov: "الإسكندرية", uni: "جامعة الإسكندرية", keys: ["اسكندريه", "اسكندرية", "جامعة اسكندريه"] },
+    { gov: "المنوفية", uni: "جامعة المنوفية", keys: ["منوفيه", "جامعة المنوفيه", "شبين الكوم"] },
+    { gov: "كفر الشيخ", uni: "جامعة كفر الشيخ", keys: ["كفر الشيخ"] },
+    { gov: "دمياط", uni: "جامعة دمياط", keys: ["دمياط"] },
+    { gov: "بورسعيد", uni: "جامعة بورسعيد", keys: ["بورسعيد"] },
+    { gov: "السويس", uni: "جامعة السويس", keys: ["السويس"] },
+    { gov: "الأقصر", uni: "جامعة الأقصر", keys: ["الاقصر"] },
+    { gov: "أسوان", uni: "جامعة أسوان", keys: ["اسوان"] },
+    { gov: "المنيا", uni: "جامعة المنيا", keys: ["المنيا", "جامعة المنيا"] },
+    { gov: "الفيوم", uni: "جامعة الفيوم", keys: ["الفيوم"] },
+    { gov: "بني سويف", uni: "جامعة بني سويف", keys: ["بني سويف", "بنى سويف"] },
+    { gov: "الوادي الجديد", uni: "جامعة الوادي الجديد", keys: ["الوادي الجديد", "خاربه"] },
+    { gov: "البحر الأحمر", uni: "جامعة الغردقة", keys: ["الغردقه", "البحر الاحمر"] },
+    { gov: "مطروح", uni: "جامعة مطروح", keys: ["مطروح"] },
+    { gov: "شمال سيناء", uni: "جامعة شمال سيناء", keys: ["شمال سيناء", "العريش"] },
+  ];
+
   function deriveGeography(record) {
-    const explicitUni = normalizeText(record.university);
-    const explicitGov = normalizeText(record.governorate);
+    const explicitUni = record.university;
+    const explicitGov = record.governorate;
     const haystack = compact([record.college, explicitUni, explicitGov].filter(Boolean).join(" "));
 
     if (record.university && record.governorate) {
@@ -275,10 +304,9 @@ const Schema = (function () {
     }
 
     if (haystack) {
-      for (let i = 0; i < CONFIG.GEO_RULES.length; i++) {
-        const rule = CONFIG.GEO_RULES[i];
-        for (let j = 0; j < rule.keys.length; j++) {
-          const k = compact(rule.keys[j]);
+      for (const rule of GEO_RULES) {
+        for (const key of rule.keys) {
+          const k = compact(key);
           if (k && haystack.indexOf(k) !== -1) {
             return {
               governorate: record.governorate || rule.gov,
@@ -313,10 +341,24 @@ const Schema = (function () {
   /* ------------------------------------------------------------------
      Canonical value aliases for categorical fields
      ------------------------------------------------------------------ */
+  /* Group keys ARE the canonical (Arabic) values.
+     Matching is two-pass (exact first, then substring) so an ambiguous alias
+     cannot steal a row — otherwise the "متطوع" alias in the نعم list matches
+     inside "غير متطوع" and flips a non-volunteer to a volunteer.
+     Must stay identical to VALUE_ALIASES in google-apps-script/Code.gs. */
   const VALUE_ALIASES = {
-    gender: { male: ["ذكر", "رجل", "male", "m"], female: ["انثى", "انثه", "بنت", "امراه", "female", "f"] },
-    studentStatus: { student: ["طالب", "طالبه", "طالب/", "undergraduate", "student"], graduate: ["خريج", "خريجه", "graduate", "graduated"] },
-    volunteer: { yes: ["نعم", "yes", "متطوع", "حالي"], no: ["لا", "no", "لست", "غير متطوع"] },
+    gender: {
+      "ذكر": ["ذكر", "رجل", "male", "m"],
+      "أنثى": ["انثى", "انثه", "بنت", "امراه", "انثي", "female", "f"],
+    },
+    studentStatus: {
+      "طالب": ["طالب", "طالبه", "طالب/", "undergraduate", "student"],
+      "خريج": ["خريج", "خريجه", "graduate", "graduated"],
+    },
+    volunteer: {
+      "نعم": ["نعم", "نعم،", "yes", "true", "متطوع", "حالي"],
+      "لا": ["لا", "لا،", "no", "false", "لست", "غير متطوع", "غيرمتطوع", "ليس"],
+    },
     academicYear: {
       "السنة الأولى": ["الاولى", "الاوله", "1", "first", "اولى"],
       "السنة الثانية": ["الثانيه", "الثانية", "2", "second"],
@@ -326,6 +368,12 @@ const Schema = (function () {
     },
   };
 
+  /* Fields where a negation word flips the answer. Checked before substring
+     matching, otherwise the "متطوع" alias inside "لست متطوعا" wins.
+     Must stay identical to NEGATIVE_CANONICAL in Code.gs. */
+  const NEGATIVE_CANONICAL = { volunteer: "لا" };
+  const NEGATION_RE = /(^|[\s،,])(لا|ليس|لست|غير|لم|لن)([\s،,]|$)/;
+
   function canonicalValue(field, raw) {
     const text = normalizeText(raw);
     if (!text) return "";
@@ -333,17 +381,37 @@ const Schema = (function () {
     if (!table) return String(raw).trim();
 
     const key = looseKey(raw);
-    for (const group in table) {
-      for (let i = 0; i < table[group].length; i++) {
-        const a = looseKey(table[group][i]);
-        if (key === a || key.indexOf(a) !== -1) return group;
+    const groups = Object.keys(table);
+
+    /* pass 1 — exact equality */
+    for (const group of groups) {
+      for (const alias of table[group]) {
+        if (key === looseKey(alias)) return group;
       }
     }
+
+    /* negation guard — must run before substring matching */
+    const neg = NEGATIVE_CANONICAL[field];
+    if (neg && NEGATION_RE.test(String(raw))) return neg;
+
+    /* pass 2 — conservative substring match */
+    for (const group of groups) {
+      for (const alias of table[group]) {
+        const a = looseKey(alias);
+        if (a.length >= 2 && key.indexOf(a) !== -1) return group;
+      }
+    }
+
     return String(raw).trim();
   }
 
   return {
     FIELDS: FIELDS,
+    /* Exported so tools/test-parity.js can prove these tables never drift
+       from their Code.gs twins. */
+    VALUE_ALIASES: VALUE_ALIASES,
+    NEGATIVE_CANONICAL: NEGATIVE_CANONICAL,
+    GEO_RULES: GEO_RULES,
     normalizeText: normalizeText,
     compact: compact,
     looseKey: looseKey,
