@@ -25,7 +25,7 @@ var UI_TEXT = {
   APP_NAME: 'FIRST STEP EVENTS',
   EVENTS: 'EVENTS 2026',
   TAGLINE: 'Registration Intelligence',
-  SUBTITLE: 'نوادي صناع الحياة بالجامعات المصرية',
+  SUBTITLE: 'صناع الحياة بالجامعات المصرية',
   ERROR_TITLE: 'تعذر الاتصال ببيانات التسجيلات',
   ERROR_BODY: 'حاول تحديث الصفحة مرة أخرى.',
   DEMO_BADGE: 'بيانات تجريبية — للعرض فقط'

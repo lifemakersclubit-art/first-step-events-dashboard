@@ -392,6 +392,10 @@
 
     function painted() {
       if (Util && typeof Util.markDataReady === 'function') Util.markDataReady();
+      // Only hide splash if we have actual data
+      if (state.payload && state.payload.summary && state.payload.summary.totalRegistrations > 0) {
+        // markDataReady already handles splash hide
+      }
     }
 
     function load() {
@@ -419,6 +423,10 @@
         painted();
       } else {
         document.body.classList.remove('ready');
+        // Show loading state in KPIs
+        ['heroTotal', 'heroUpdated', 'pulseDelta', 'pulseMeta', 'kpiTotal', 'kpiEvents', 'kpiGovernorates', 'kpiDays'].forEach(function(id) {
+          if (els[id]) els[id].textContent = 'جاري التحميل…';
+        });
       }
 
       var prefetched = bootPrefetch;
@@ -428,7 +436,9 @@
         var payload = applyLocalView(!cached);
         writeView(viewKey(state.filters), payload);
         renderFilterStatus(payload);
-      }).catch(function () {
+      }).catch(function (err) {
+        // If dataset fails, try dashboard endpoint
+        console.warn('Dataset load failed, trying dashboard endpoint:', err);
         requestView(!cached, null);
       });
     }

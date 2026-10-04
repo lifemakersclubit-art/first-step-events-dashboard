@@ -62,6 +62,8 @@ var Util = (function () {
         splash.style.display = 'none';
       }, 600);
     }
+    // Force body ready state
+    document.body.classList.add('ready');
   }
 
   function debounce(fn, ms) {
