@@ -1,0 +1,292 @@
+/* ==========================================================================
+   responsive.css — Desktop-first executive layout, graceful degradation
+   Priority order: Desktop (board members) > Laptop > Tablet > Phone
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   ≤1500px — tighten the KPI grid
+   -------------------------------------------------------------------------- */
+@media (max-width: 1500px) {
+  .kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .kpis--speed {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .kpi--hero {
+    grid-column: span 2;
+  }
+
+  .grid--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   ≤1200px — laptop
+   -------------------------------------------------------------------------- */
+@media (max-width: 1200px) {
+  :root {
+    --sp-5: 20px;
+    --sp-6: 24px;
+  }
+
+  .hero {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hero__stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .grid--2a,
+  .grid--2b,
+  .grid--3 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpis {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .kpis--a {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpis--b {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .kpis--speed {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   ≤900px — tablet
+   -------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+  :root {
+    --topbar-h: 56px;
+    --fs-body: 0.9rem;
+  }
+
+  .topbar__inner {
+    gap: var(--sp-3);
+  }
+
+  .brand__sub {
+    display: none;
+  }
+
+  .control-rail {
+    position: static;
+  }
+
+  .control-rail__inner {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+
+  .control-rail__inner::-webkit-scrollbar {
+    display: none;
+  }
+
+  .rail__spacer,
+  .rail__meta {
+    display: none;
+  }
+
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpis--a,
+  .kpis--b,
+  .kpis--speed {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpis--speed > .kpi:last-child {
+    grid-column: span 2;
+  }
+
+  .kpi--hero,
+  .kpi--tall {
+    grid-column: span 2;
+    grid-row: span 1;
+  }
+
+  .grid--2,
+  .grid--2a,
+  .grid--2b,
+  .grid--3,
+  .grid--4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .span-2 {
+    grid-column: span 1;
+  }
+
+  .hero__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .bar__meta {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .donut {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .donut__fig {
+    align-self: center;
+  }
+
+  .setrow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-2);
+  }
+
+  .ruler__ticks {
+    height: 42px;
+  }
+
+  .ruler__hour {
+    font-size: 8px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   ≤620px — phone (secondary target, still usable)
+   -------------------------------------------------------------------------- */
+@media (max-width: 620px) {
+  :root {
+    --gutter: 12px;
+    --fs-h1: 1.25rem;
+    --fs-h2: 1.1rem;
+    --fs-kpi: 1.6rem;
+    --fs-hero: 2.9rem;
+    --sp-5: 16px;
+    --sp-6: 18px;
+  }
+
+  .topbar__live .livepill {
+    display: none;
+  }
+
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpi,
+  .kpi--hero {
+    grid-column: span 2;
+    min-height: 0;
+  }
+
+  .kpi__val {
+    font-size: 1.5rem;
+  }
+
+  .hero__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .ruler__hours {
+    display: none;
+  }
+
+  .barrow {
+    grid-template-columns: minmax(72px, 1fr) minmax(0, 2fr);
+    grid-template-areas: "name track" ". val";
+  }
+
+  .barrow__name {
+    grid-area: name;
+  }
+
+  .barrow__track {
+    grid-area: track;
+  }
+
+  .barrow__val {
+    grid-area: val;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
+  .hero__num {
+    font-size: 3rem;
+  }
+
+  .heat__cell {
+    min-height: 16px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Print — executive PDF export
+   -------------------------------------------------------------------------- */
+@media print {
+  .view {
+    display: block !important;
+  }
+
+  .panel,
+  .kpi,
+  .hero__pace,
+  .snapshot {
+    break-inside: avoid;
+  }
+
+  .skel {
+    display: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Wide desktop polish — 1920px+
+   -------------------------------------------------------------------------- */
+@media (min-width: 1800px) {
+  .kpis {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .kpis--a,
+  .kpis--b {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .kpis--speed {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .hero {
+    grid-template-columns: minmax(0, 1.42fr) minmax(0, 1fr);
+  }
+
+  .hero__num {
+    font-size: 6.8rem;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Coarse pointer — bigger hit targets, no hover-only affordances
+   -------------------------------------------------------------------------- */
+@media (hover: none) {
+  .kpi:hover {
+    transform: none;
+  }
+
+  .heat__cell[data-v]:hover {
+    transform: none;
+    color: inherit;
+  }
+}

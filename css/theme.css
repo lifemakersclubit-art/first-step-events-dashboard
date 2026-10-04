@@ -1,0 +1,384 @@
+/* ============================================================
+   HAYAT MAKERS — Central Events Command Center
+   css/theme.css — design tokens, base, atmosphere
+   Identity: Editorial + Cultural Data Dashboard
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;500;700;800;900&display=swap");
+
+/* Local decorative font (optional) */
+@font-face {
+  font-family: 'Arslan';
+  src: url('../assets/fonts/Arslan.ttf') format('truetype');
+  font-weight: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Arslan';
+  src: url('../assets/fonts/ArslanBold.ttf') format('truetype');
+  font-weight: 700;
+  font-display: swap;
+}
+
+:root {
+  /* Palette — Hayat Makers brand (from logo) */
+  --blue: #014976;
+  --blue-deep: #06344F;
+  --blue-ink: #06293F;
+  --blue-soft: #1E5B7E;
+  --blue-tint: #EAF1F6;
+  --orange: #FBAE42;
+  --orange-deep: #F17206;
+  --light: #F4F3EF;
+  --white: #FFFFFF;
+
+  --ink: #1B2833;
+  --muted: #5C5C54;
+
+  --line: rgba(1, 73, 118, 0.16);
+  --line-soft: rgba(1, 73, 118, 0.08);
+
+  --card: var(--white);
+  --bg: var(--light);
+
+  --font-display: 'Alexandria', 'Segoe UI', Tahoma, sans-serif;
+  --font-art: 'Arslan', 'Alexandria', 'Segoe UI', Tahoma, sans-serif;
+
+  --radius: 4px;
+  --radius-lg: 10px;
+
+  --shadow-soft: 0 18px 50px -30px rgba(6, 52, 79, 0.35);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --head-h: 68px;
+}
+
+/* ---------- Reset / base ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+html:focus-within {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-display);
+  background-color: var(--light);
+  color: var(--ink);
+  line-height: 1.6;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* Atmosphere: subtle grain + soft blue/orange meshes */
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  pointer-events: none;
+  opacity: 0.55;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+}
+
+.bg-shape {
+  position: fixed;
+  z-index: -1;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(90px);
+}
+.bg-shape--one {
+  width: 560px;
+  height: 560px;
+  top: -180px;
+  left: -140px;
+  background: radial-gradient(circle at 30% 30%, rgba(1, 73, 118, 0.16), rgba(1, 73, 118, 0) 68%);
+}
+.bg-shape--two {
+  width: 460px;
+  height: 460px;
+  bottom: 8%;
+  right: -160px;
+  background: radial-gradient(circle at 60% 60%, rgba(251, 174, 66, 0.18), rgba(251, 174, 66, 0) 70%);
+}
+
+img,
+canvas {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--orange-deep);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ---------- Layout scaffold ---------- */
+.wrap {
+  max-width: 1280px;
+  margin-inline: auto;
+  padding-inline: clamp(16px, 4vw, 44px);
+}
+
+main {
+  padding-top: clamp(24px, 5vh, 56px);
+}
+
+/* ---------- Header / navigation ---------- */
+.site-head {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 14px clamp(16px, 4vw, 44px);
+  background: rgba(6, 52, 79, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--white);
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand__mark {
+  width: 34px;
+  height: 34px;
+}
+
+.brand__word {
+  font-weight: 900;
+  font-size: 1.05rem;
+  letter-spacing: 0.18em;
+}
+
+.brand__sub {
+  font-size: 0.72rem;
+  letter-spacing: 0.3em;
+  color: var(--orange);
+  font-weight: 700;
+  margin-right: -2px;
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 2vw, 26px);
+}
+
+.site-nav a {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.82);
+  padding: 8px 4px;
+  border-bottom: 2px solid transparent;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.site-nav a:hover {
+  color: var(--white);
+}
+
+.site-nav a[aria-current="page"] {
+  color: var(--white);
+  border-bottom-color: var(--orange);
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-weight: 700;
+  transition: transform 0.15s var(--ease), background 0.2s var(--ease), border-color 0.2s var(--ease);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--blue);
+}
+
+.btn--ghost:hover {
+  border-color: var(--blue);
+  background: var(--blue-tint);
+}
+
+.btn--primary {
+  background: var(--orange);
+  color: var(--blue-ink);
+  border-color: var(--orange);
+}
+
+.btn--primary:hover {
+  background: var(--orange-deep);
+  border-color: var(--orange-deep);
+}
+
+/* ---------- Inputs ---------- */
+.input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--white);
+  color: var(--ink);
+  transition: border-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(1, 73, 118, 0.12);
+}
+
+select.input {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23014976' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 14px center;
+  cursor: pointer;
+}
+
+select.input option {
+  color: var(--ink);
+}
+
+/* ---------- Demo badge ---------- */
+.demo-badge {
+  display: inline-block;
+  margin-bottom: 18px;
+  padding: 8px 16px;
+  background: var(--orange);
+  color: var(--blue-ink);
+  font-weight: 800;
+  font-size: 0.85rem;
+  border-radius: 999px;
+  box-shadow: var(--shadow-soft);
+}
+
+/* ---------- Error state ---------- */
+.error-state {
+  position: relative;
+  border: 1px solid rgba(241, 114, 6, 0.5);
+  background: rgba(251, 174, 66, 0.12);
+  color: var(--blue-ink);
+  padding: clamp(22px, 4vw, 40px);
+  margin-bottom: 28px;
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.error-state__title {
+  font-size: clamp(1.25rem, 3vw, 1.7rem);
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.error-state__body {
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+
+/* ---------- Footer ---------- */
+.site-foot {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-top: clamp(48px, 8vh, 90px);
+  padding-block: 34px 42px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.site-foot__word {
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  font-size: 1.05rem;
+  color: var(--blue);
+}
+
+.site-foot__word span {
+  color: var(--orange-deep);
+}
+
+.site-foot__updated {
+  font-size: 0.85rem;
+}
+
+.site-foot__updated span {
+  font-family: 'Alexandria', Tahoma, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Reduced motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

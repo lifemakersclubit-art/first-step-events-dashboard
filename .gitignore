@@ -1,0 +1,17 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Node (test tooling only — the app has zero runtime dependencies)
+node_modules/
+package-lock.json
+
+# Logs & temp
+*.log
+.cache/
+tmp/
+
+# Google Apps Script local clasp state (if used later)
+.clasprc.json
+appsscript.json.bak

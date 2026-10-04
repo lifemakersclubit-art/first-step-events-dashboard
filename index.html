@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="مركز قيادة الإيفنتات المركزية — أندية صناع الحياة بالجامعات المصرية" />
+  <title>Hayat Makers — Central Events Command Center</title>
+  <meta name="theme-color" content="#014976" />
+
+  <link rel="icon" type="image/svg+xml" href="assets/logo/mark.svg" />
+
+  <!-- Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@300;400;500;700;800;900&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/dashboard.css" />
+  <link rel="stylesheet" href="css/responsive.css" />
+</head>
+<body>
+
+  <div class="grain" aria-hidden="true"></div>
+  <div class="bg-shape bg-shape--one" aria-hidden="true"></div>
+  <div class="bg-shape bg-shape--two" aria-hidden="true"></div>
+
+  <!-- ============ SPLASH (first 3s) ============ -->
+  <div class="splash" id="splash" role="presentation">
+    <div class="splash__inner">
+      <img class="splash__logo" src="assets/logo/lifemakers.png" alt="نوادي صناع الحياة" width="320" height="auto" />
+      <p class="splash__title">نوادي صناع الحياة بالجامعات المصرية</p>
+      <p class="splash__line">فيرست ستيب إيفنتس</p>
+      <p class="splash__fest">FIRST STEP EVENTS — 2026</p>
+    </div>
+  </div>
+
+  <header class="site-head">
+    <a class="brand" href="index.html" aria-label="First Step Events — الصفحة الرئيسية">
+      <img class="brand__mark" src="assets/logo/mark.svg" alt="" width="34" height="34" />
+      <span class="brand__word">FIRST STEP EVENTS</span>
+    </a>
+
+    <nav class="site-nav" aria-label="التنقل الرئيسي">
+      <a href="index.html" aria-current="page">لوحة القيادة</a>
+      <a href="#events">الإيفنتات</a>
+      <a href="#speed">سرعة التسجيل</a>
+      <a href="#geo">الجغرافيا</a>
+      <a href="#audience">الجمهور</a>
+      <a href="#quality">جودة البيانات</a>
+    </nav>
+  </header>
+
+  <main id="main" class="wrap">
+
+    <div class="org-badge reveal">
+      <img class="org-badge__logo" src="assets/logo/lifemakers.png" alt="نوادي صناع الحياة" width="220" height="auto" />
+      <p class="org-badge__title">نوادي صناع الحياة بالجامعات المصرية</p>
+    </div>
+
+    <section class="error-state" id="errorState" hidden>
+      <h2 class="error-state__title">تعذر الاتصال ببيانات التسجيلات</h2>
+      <p class="error-state__body">حاول تحديث الصفحة مرة أخرى.</p>
+      <button class="btn btn--ghost" type="button" id="retryBtn">إعادة المحاولة</button>
+    </section>
+
+    <!-- ============ HERO ============ -->
+    <section class="hero reveal" aria-labelledby="heroTitle">
+      <div class="hero__copy">
+        <p class="hero__kicker">فيرست ستيب إيفنتس · أندية صناع الحياة بالجامعات المصرية</p>
+        <h1 id="heroTitle" class="hero__word">
+          <span class="hero__word-line">FIRST STEP</span>
+          <span class="hero__word-line hero__word-line--accent">EVENTS 2026</span>
+        </h1>
+        <p class="hero__tagline">Registration Intelligence</p>
+        <p class="hero__sub">نوادي صناع الحياة بالجامعات المصرية</p>
+      </div>
+
+      <div class="hero__panel">
+        <div class="hero__stat hero__stat--main">
+          <span class="hero__stat-num" id="heroTotal">—</span>
+          <span class="hero__stat-label">إجمالي المسجلين</span>
+        </div>
+        <div class="hero__stat">
+          <span class="hero__stat-num hero__stat-num--sm" id="heroUpdated">—</span>
+          <span class="hero__stat-label">آخر تحديث</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ FILTERS ============ -->
+    <section class="dfilter reveal" aria-labelledby="dfilterTitle">
+      <div class="dfilter__head">
+        <h2 class="section-title" id="dfilterTitle">تصفية البيانات</h2>
+        <p class="dfilter__hint">اختر ما تريد عرضه فقط</p>
+        <span class="dfilter__busy" id="dFilterBusy" hidden aria-live="polite">
+          <span class="dfilter__spin" aria-hidden="true"></span>
+          جارٍ التحديث…
+        </span>
+      </div>
+
+      <div class="dfilter__grid">
+        <div class="dfilter__field">
+          <label for="dFilterEvent">الإيفنت</label>
+          <select id="dFilterEvent" class="dfilter__select input">
+            <option value="">كل الإيفنتات</option>
+          </select>
+        </div>
+
+        <div class="dfilter__field">
+          <label for="dFilterGov">المحافظة</label>
+          <select id="dFilterGov" class="dfilter__select input">
+            <option value="">كل المحافظات</option>
+          </select>
+        </div>
+
+        <div class="dfilter__field">
+          <label for="dFilterUni">الجامعة</label>
+          <select id="dFilterUni" class="dfilter__select input">
+            <option value="">كل الجامعات</option>
+          </select>
+        </div>
+
+        <div class="dfilter__field">
+          <label for="dFilterGender">النوع</label>
+          <select id="dFilterGender" class="dfilter__select input">
+            <option value="">كل الأنواع</option>
+          </select>
+        </div>
+
+        <div class="dfilter__field">
+          <label for="dFilterStatus">طالب / خريج</label>
+          <select id="dFilterStatus" class="dfilter__select input">
+            <option value="">كل الحالات</option>
+          </select>
+        </div>
+
+        <div class="dfilter__field">
+          <label for="dFilterVolunteer">التطوع</label>
+          <select id="dFilterVolunteer" class="dfilter__select input">
+            <option value="">كل الحالات</option>
+          </select>
+        </div>
+
+        <div class="dfilter__field">
+          <label for="dFilterSource">المصدر</label>
+          <select id="dFilterSource" class="dfilter__select input">
+            <option value="">كل المصادر</option>
+          </select>
+        </div>
+
+        <div class="dfilter__actions">
+          <button type="button" id="dFilterReset" class="dfilter__reset btn btn--ghost">إلغاء التصفية</button>
+        </div>
+      </div>
+
+      <p class="dfilter__status" id="dFilterStatus" role="status" aria-live="polite"></p>
+    </section>
+
+    <!-- ============ ABOUT (Board summary) ============ -->
+    <section class="about reveal">
+      <h2 class="section-title">ماذا تقدم هذه اللوحة؟</h2>
+      <ul class="about__list">
+        <li>تعرض إجمالي التسجيلات وأحدث تحديث فوري</li>
+        <li>تتابع حركة التسجيل يوم بيوم</li>
+        <li>ترتب الإيفنتات حسب الطلب والسرعة</li>
+        <li>تبين التوزيع الجغرافي للمشاركين</li>
+        <li>تحلل الجمهور: النوع، السن، السنة الدراسية، الكلية</li>
+        <li>تفحص جودة البيانات ونسب الاكتمال</li>
+        <li>تعمل على أي جهاز (موبايل أو كمبيوتر) بدون تثبيت</li>
+      </ul>
+    </section>
+
+    <!-- ============ FESTIVAL PULSE (Velocity) ============ -->
+    <section class="pulse reveal" id="pulse" aria-labelledby="pulseTitle">
+      <header class="section-head section-head--row">
+        <div>
+          <p class="section-kicker">حركة التسجيل عبر الأيام</p>
+          <h2 class="section-title" id="pulseTitle">Event Pulse</h2>
+        </div>
+        <div class="pulse__readout">
+          <div class="pulse__nums">
+            <span class="pulse__delta" id="pulseDelta">—</span>
+            <span class="pulse__trend" id="pulseTrend" aria-hidden="true"></span>
+          </div>
+          <span class="pulse__meta" id="pulseMeta">تسجيل في آخر يوم</span>
+        </div>
+      </header>
+
+      <div class="card chart-card chart-card--tall">
+        <div class="chart-wrap" role="img" aria-label="خط اتجاه التسجيلات اليومية">
+          <canvas id="dailyChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ KPI STRIP ============ -->
+    <section class="kpis reveal" aria-label="مؤشرات رئيسية">
+      <div class="kpi">
+        <span class="kpi__num" id="kpiTotal">—</span>
+        <span class="kpi__label">إجمالي التسجيلات</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi__num" id="kpiEvents">—</span>
+        <span class="kpi__label">الإيفنتات</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi__num" id="kpiGovernorates">—</span>
+        <span class="kpi__label">المحافظات</span>
+      </div>
+      <div class="kpi">
+        <span class="kpi__num" id="kpiDays">—</span>
+        <span class="kpi__label">أيام فيها تسجيلات</span>
+      </div>
+    </section>
+
+    <!-- ============ EVENT INTELLIGENCE ============ -->
+    <section class="intel reveal" id="events" aria-labelledby="eventsTitle">
+      <header class="section-head">
+        <p class="section-kicker">الطلب على الإيفنتات</p>
+        <h2 class="section-title" id="eventsTitle">Event Intelligence</h2>
+        <p class="section-lead">ترتيب الإيفنتات حسب عدد التسجيلات والسرعة، مع تفاصيل كل إيفنت.</p>
+      </header>
+
+      <div class="intel__grid">
+        <ol class="activity-list" id="eventList" aria-label="قائمة الإيفنتات مرتبة">
+          <li class="activity-list__skeleton" aria-hidden="true"><span></span><span></span><span></span></li>
+          <li class="activity-list__skeleton" aria-hidden="true"><span></span><span></span><span></span></li>
+          <li class="activity-list__skeleton" aria-hidden="true"><span></span><span></span><span></span></li>
+        </ol>
+
+        <aside class="card chart-card" aria-label="رسم بياني: التسجيلات حسب الإيفنت">
+          <div class="chart-wrap">
+            <canvas id="eventChart"></canvas>
+          </div>
+          <p class="card__note">التسجيلات لكل إيفنت · كنسبة من الإجمالي</p>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ GEOGRAPHIC ============ -->
+    <section class="geo reveal" id="geo" aria-labelledby="geoTitle">
+      <header class="section-head">
+        <p class="section-kicker">التوزيع الجغرافي</p>
+        <h2 class="section-title" id="geoTitle">Geographic Distribution</h2>
+        <p class="section-lead">أين يتوزع المشاركون؟ المحافظات والجامعات مرتبة حسب حجم التسجيلات.</p>
+      </header>
+
+      <div class="geo__grid">
+        <ol class="rank-list" id="govList" aria-label="ترتيب المحافظات">
+          <li class="rank-list__skeleton" aria-hidden="true"><span></span><span></span></li>
+          <li class="rank-list__skeleton" aria-hidden="true"><span></span><span></span></li>
+        </ol>
+
+        <aside class="card chart-card" aria-label="رسم بياني: التسجيلات حسب المحافظة">
+          <div class="chart-wrap">
+            <canvas id="govChart"></canvas>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ REGISTRATION TREND ============ -->
+    <section class="trend reveal" id="speed" aria-labelledby="trendTitle">
+      <header class="section-head">
+        <p class="section-kicker">إيقاع التراكم</p>
+        <h2 class="section-title" id="trendTitle">Registration Trend</h2>
+        <p class="section-lead">متوسط الحصيلة اليومية وموازنة آخر أيام التسجيل مقابل بدايتها.</p>
+      </header>
+
+      <div class="trend__grid">
+        <div class="trend__stat">
+          <span class="trend__num" id="trendAverage">—</span>
+          <span class="trend__meta">متوسط التسجيلات اليومي</span>
+        </div>
+        <div class="trend__stat">
+          <span class="trend__num" id="trendPeak">—</span>
+          <span class="trend__meta">أعلى يوم تسجيل</span>
+        </div>
+        <div class="trend__bars" id="trendBars" aria-label="التسجيلات اليومية">
+          <span class="trend-bars__skeleton"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ PARTICIPANT PROFILE ============ -->
+    <section class="profile reveal" id="audience" aria-labelledby="profileTitle">
+      <header class="section-head">
+        <p class="section-kicker">لمحة عن المشاركين</p>
+        <h2 class="section-title" id="profileTitle">Participant Profile</h2>
+        <p class="section-lead">توزيع النوع، السن، السنة الدراسية، والكلية ضمن التسجيلات.</p>
+      </header>
+
+      <div class="profile__grid">
+        <div class="card chart-card">
+          <h3 class="card__title">النوع</h3>
+          <div class="chart-wrap chart-wrap--donut" role="img" aria-label="توزيع النوع">
+            <canvas id="genderChart"></canvas>
+          </div>
+        </div>
+        <div class="card chart-card">
+          <h3 class="card__title">السن</h3>
+          <div class="chart-wrap chart-wrap--donut" role="img" aria-label="توزيع السن">
+            <canvas id="ageChart"></canvas>
+          </div>
+        </div>
+        <div class="card chart-card">
+          <h3 class="card__title">السنة الدراسية</h3>
+          <div class="chart-wrap chart-wrap--donut" role="img" aria-label="السنة الدراسية">
+            <canvas id="yearChart"></canvas>
+          </div>
+        </div>
+        <div class="card chart-card">
+          <h3 class="card__title">أكثر الكليات</h3>
+          <div class="chart-wrap chart-wrap--donut" role="img" aria-label="الكلية">
+            <canvas id="collegeChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ DATA QUALITY ============ -->
+    <section class="quality reveal" id="quality" aria-labelledby="qualityTitle">
+      <header class="section-head">
+        <p class="section-kicker">جودة البيانات</p>
+        <h2 class="section-title" id="qualityTitle">Data Quality</h2>
+        <p class="section-lead">نسب الاكتمال والصلاحية والتكرار لكل حقل.</p>
+      </header>
+
+      <div class="quality__grid">
+        <div class="card chart-card">
+          <h3 class="card__title">درجة الجودة</h3>
+          <div class="quality__score">
+            <span class="quality__num" id="qualityScore">—</span>
+            <span class="quality__label">%</span>
+          </div>
+          <div class="quality__bar" id="qualityBar" role="progressbar" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+        <div class="card chart-card">
+          <h3 class="card__title">المشاكل</h3>
+          <ol class="issue-list" id="issueList"></ol>
+        </div>
+      </div>
+    </section>
+
+    <footer class="site-foot">
+      <div>
+        <p class="site-foot__word">FIRST STEP EVENTS <span>2026</span></p>
+        <p>Registration Intelligence — نوادي صناع الحياة بالجامعات المصرية</p>
+      </div>
+      <p class="site-foot__updated">آخر تحديث <span id="footUpdated">—</span></p>
+    </footer>
+
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+
+  <script src="js/config.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/filter-engine.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/dashboard.js"></script>
+</body>
+</html>
