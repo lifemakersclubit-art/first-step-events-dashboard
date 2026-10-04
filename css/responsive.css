@@ -1,292 +1,575 @@
 /* ==========================================================================
-   responsive.css — Desktop-first executive layout, graceful degradation
-   Priority order: Desktop (board members) > Laptop > Tablet > Phone
+   responsive.css — mobile-first corrections for the CURRENT markup
+   --------------------------------------------------------------------------
+   The previous version of this file targeted a long-gone layout (.topbar,
+   .control-rail, .barrow, .ruler, .heat) and therefore did nothing at all on
+   the live page. Everything below is written against the class names that
+   actually exist in index.html / dashboard.css.
+
+   Breakpoints
+     ≤1280px  laptop        hero stacks, profile 2-up stays
+     ≤1024px  small laptop  intel + geo stack, nav scrolls
+     ≤820px   tablet        KPIs 2-up, filters 2-up, charts shorter
+     ≤620px   phone         single column, 16px controls (no iOS zoom),
+                            nav scrolls, day bars scroll horizontally
+     ≤420px   small phone   tightest pass
    ========================================================================== */
 
 /* --------------------------------------------------------------------------
-   ≤1500px — tighten the KPI grid
+   Guard rails — nothing should ever scroll the page sideways
    -------------------------------------------------------------------------- */
-@media (max-width: 1500px) {
-  .kpis {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/* The decorative blur layers are a real cost on low-end phones. */
+@media (max-width: 820px) {
+  .grain {
+    opacity: 0.4;
   }
 
-  .kpis--speed {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .bg-shape {
+    filter: blur(60px);
+    opacity: 0.7;
   }
 
-  .kpi--hero {
-    grid-column: span 2;
+  .bg-shape--one {
+    width: 320px;
+    height: 320px;
   }
 
-  .grid--4 {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .bg-shape--two {
+    width: 260px;
+    height: 260px;
   }
 }
 
 /* --------------------------------------------------------------------------
-   ≤1200px — laptop
+   ≤1280px — laptop
    -------------------------------------------------------------------------- */
-@media (max-width: 1200px) {
-  :root {
-    --sp-5: 20px;
-    --sp-6: 24px;
+@media (max-width: 1280px) {
+  .hero {
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: clamp(18px, 3vw, 40px);
   }
 
+  .intel__grid,
+  .geo__grid {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   ≤1024px — small laptop / large tablet
+   -------------------------------------------------------------------------- */
+@media (max-width: 1024px) {
+  /* HERO stacks: the stat panel becomes a full-width band under the wordmark */
   .hero {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .hero__stats {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .hero__panel {
+    min-width: 0;
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 18px 28px;
+    padding: clamp(18px, 3vw, 26px);
   }
 
-  .grid--2a,
-  .grid--2b,
-  .grid--3 {
+  .hero__stat--main {
+    margin-bottom: 0;
+  }
+
+  /* One column for the list + chart pairs so neither is squeezed */
+  .intel__grid,
+  .geo__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .intel__grid .chart-card,
+  .geo__grid .chart-card {
+    height: clamp(280px, 52vw, 380px);
+  }
+
+  .trend__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .kpis {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .trend__bars-scroll {
+    grid-column: 1 / -1;
   }
 
-  .kpis--a {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Nav: scroll rather than wrap, so the sticky header keeps one tidy row */
+  .site-head {
+    gap: 14px;
+    padding-inline: clamp(12px, 3vw, 24px);
   }
 
-  .kpis--b {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+  .site-nav {
+    gap: 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    /* let the nav shrink instead of pushing the brand off-screen */
+    min-width: 0;
   }
 
-  .kpis--speed {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+  .site-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .site-nav a {
+    white-space: nowrap;
+    font-size: 0.85rem;
+  }
+
+  .brand__word {
+    font-size: 0.95rem;
+    letter-spacing: 0.12em;
   }
 }
 
 /* --------------------------------------------------------------------------
    ≤900px — tablet
+   Filters go 2-up here rather than at phone width: at 768px the auto-fit grid
+   was squeezing three or four selects into ~215px each, and anything under
+   16px makes iOS Safari zoom the viewport on focus.
    -------------------------------------------------------------------------- */
 @media (max-width: 900px) {
-  :root {
-    --topbar-h: 56px;
-    --fs-body: 0.9rem;
-  }
-
-  .topbar__inner {
-    gap: var(--sp-3);
-  }
-
-  .brand__sub {
-    display: none;
-  }
-
-  .control-rail {
-    position: static;
-  }
-
-  .control-rail__inner {
-    overflow-x: auto;
-    flex-wrap: nowrap;
-    scrollbar-width: none;
-  }
-
-  .control-rail__inner::-webkit-scrollbar {
-    display: none;
-  }
-
-  .rail__spacer,
-  .rail__meta {
-    display: none;
-  }
-
   .kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 
-  .kpis--a,
-  .kpis--b,
-  .kpis--speed {
+  .kpi {
+    padding: 14px 16px;
+  }
+
+  .dfilter__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 
-  .kpis--speed > .kpi:last-child {
-    grid-column: span 2;
+  .dfilter__select,
+  .dfilter__reset {
+    font-size: 16px;
+    padding: 11px 12px;
   }
 
-  .kpi--hero,
-  .kpi--tall {
-    grid-column: span 2;
-    grid-row: span 1;
-  }
-
-  .grid--2,
-  .grid--2a,
-  .grid--2b,
-  .grid--3,
-  .grid--4 {
+  .profile__grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .span-2 {
-    grid-column: span 1;
+  .profile__grid .card.chart-card {
+    height: clamp(320px, 74vw, 400px);
   }
 
-  .hero__stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .section-head--row {
+    align-items: flex-start;
   }
 
-  .bar__meta {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .pulse__readout {
+    text-align: start;
   }
 
-  .donut {
-    flex-direction: column;
-    align-items: stretch;
+  .pulse__nums {
+    justify-content: flex-start;
   }
 
-  .donut__fig {
-    align-self: center;
+  .activity-item {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 14px 14px 16px;
   }
 
-  .setrow {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-2);
+  .rank-item {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+    gap: 10px;
   }
 
-  .ruler__ticks {
-    height: 42px;
-  }
-
-  .ruler__hour {
-    font-size: 8px;
+  .about__list li {
+    line-height: 1.7;
   }
 }
 
 /* --------------------------------------------------------------------------
-   ≤620px — phone (secondary target, still usable)
+   ≤620px — phone
    -------------------------------------------------------------------------- */
 @media (max-width: 620px) {
   :root {
-    --gutter: 12px;
-    --fs-h1: 1.25rem;
-    --fs-h2: 1.1rem;
-    --fs-kpi: 1.6rem;
-    --fs-hero: 2.9rem;
-    --sp-5: 16px;
-    --sp-6: 18px;
+    --fs-body: 0.9rem;
   }
 
-  .topbar__live .livepill {
-    display: none;
+  .wrap {
+    padding-inline: 14px;
   }
 
-  .kpis {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  main {
+    padding-top: 18px;
   }
 
-  .kpi,
-  .kpi--hero {
-    grid-column: span 2;
-    min-height: 0;
+  /* ---- Header ---- */
+  .site-head {
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 8px;
+    padding-block: 10px;
   }
 
-  .kpi__val {
-    font-size: 1.5rem;
+  .brand {
+    gap: 8px;
   }
 
-  .hero__stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .brand__mark {
+    width: 28px;
+    height: 28px;
   }
 
-  .ruler__hours {
-    display: none;
+  .brand__word {
+    font-size: 0.82rem;
+    letter-spacing: 0.1em;
   }
 
-  .barrow {
-    grid-template-columns: minmax(72px, 1fr) minmax(0, 2fr);
-    grid-template-areas: "name track" ". val";
+  /* Nav gets its own full-width scroll row under the brand */
+  .site-nav {
+    order: 3;
+    width: 100%;
+    gap: 14px;
+    padding-bottom: 2px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    padding-top: 6px;
   }
 
-  .barrow__name {
-    grid-area: name;
+  .site-nav a {
+    font-size: 0.8rem;
+    padding-block: 4px;
   }
 
-  .barrow__track {
-    grid-area: track;
+  /* ---- Splash ---- */
+  .splash__logo {
+    width: min(64vw, 220px);
   }
 
-  .barrow__val {
-    grid-area: val;
-    justify-content: flex-start;
-    min-width: 0;
+  .splash__fest {
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
   }
 
-  .hero__num {
-    font-size: 3rem;
+  /* ---- Org badge ---- */
+  .org-badge {
+    margin-bottom: 18px;
+    gap: 6px;
   }
 
-  .heat__cell {
-    min-height: 16px;
-  }
-}
-
-/* --------------------------------------------------------------------------
-   Print — executive PDF export
-   -------------------------------------------------------------------------- */
-@media print {
-  .view {
-    display: block !important;
+  .org-badge__logo {
+    width: min(48vw, 150px);
   }
 
-  .panel,
-  .kpi,
-  .hero__pace,
-  .snapshot {
-    break-inside: avoid;
-  }
-
-  .skel {
-    display: none;
-  }
-}
-
-/* --------------------------------------------------------------------------
-   Wide desktop polish — 1920px+
-   -------------------------------------------------------------------------- */
-@media (min-width: 1800px) {
-  .kpis {
-    grid-template-columns: repeat(6, minmax(0, 1fr));
-  }
-
-  .kpis--a,
-  .kpis--b {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .kpis--speed {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
+  /* ---- Hero ---- */
   .hero {
-    grid-template-columns: minmax(0, 1.42fr) minmax(0, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
   }
 
-  .hero__num {
-    font-size: 6.8rem;
+  .hero__word {
+    font-size: clamp(2.3rem, 12vw, 3.4rem);
+  }
+
+  .hero__tagline {
+    margin-top: 14px;
+    font-size: 1rem;
+  }
+
+  .hero__panel {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    padding: 18px;
+  }
+
+  .hero__stat-num {
+    font-size: clamp(2.1rem, 11vw, 2.9rem);
+  }
+
+  .hero__stat-num--sm {
+    font-size: 1.15rem;
+  }
+
+  /* ---- Filters: one column ---- */
+  .dfilter {
+    padding: 14px;
+  }
+
+  .dfilter__grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .dfilter__field label {
+    font-size: 0.75rem;
+  }
+
+  .dfilter__status {
+    font-size: 0.75rem;
+  }
+
+  /* ---- Touch targets ----
+     Width-based, not (hover: none) based: a stylus/touch laptop or a
+     headless/emulated viewport still needs comfortable targets. */
+  .activity-item,
+  .dfilter__select,
+  .dfilter__reset,
+  .dfilter__busy,
+  .site-nav a {
+    min-height: 44px;
+  }
+
+  .activity-item {
+    align-content: center;
+  }
+
+  .site-nav a {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* ---- Sections ---- */
+  .section-title {
+    font-size: clamp(1.35rem, 7vw, 1.7rem);
+  }
+
+  .section-lead {
+    font-size: 0.88rem;
+    margin-top: 8px;
+  }
+
+  .section-kicker {
+    font-size: 0.8rem;
+  }
+
+  /* ---- KPIs ---- */
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-bottom: 32px;
+  }
+
+  .kpi {
+    padding: 12px 13px;
+    border-radius: var(--radius);
+  }
+
+  .kpi::before {
+    width: 3px;
+  }
+
+  .kpi__num {
+    font-size: clamp(1.4rem, 7.5vw, 1.8rem);
+  }
+
+  .kpi__label {
+    font-size: 0.74rem;
+    line-height: 1.35;
+  }
+
+  /* ---- Pulse ---- */
+  .pulse__delta {
+    font-size: clamp(1.7rem, 9vw, 2.4rem);
+  }
+
+  .chart-card--tall {
+    min-height: 240px;
+  }
+
+  .chart-wrap {
+    min-height: 220px;
+  }
+
+  .chart-wrap--donut {
+    min-height: 280px;
+  }
+
+  .intel__grid .chart-card,
+  .geo__grid .chart-card {
+    height: clamp(260px, 78vw, 340px);
+  }
+
+  .profile__grid .card.chart-card {
+    height: clamp(300px, 84vw, 380px);
+  }
+
+  /* ---- Lists ---- */
+  .activity-item {
+    grid-template-columns: 32px minmax(0, 1fr);
+    grid-template-areas:
+      'index name'
+      'index count';
+    gap: 4px 10px;
+    padding: 12px 13px 14px;
+  }
+
+  .activity-item__index { grid-area: index; align-self: start; font-size: 1rem; }
+  .activity-item__body { grid-area: name; min-width: 0; }
+  .activity-item__count {
+    grid-area: count;
+    flex-direction: row;
+    align-items: baseline;
+    gap: 8px;
+  }
+
+  .activity-item__name {
+    font-size: 0.95rem;
+  }
+
+  .activity-item__num {
+    font-size: 1.1rem;
+  }
+
+  .rank-item {
+    grid-template-columns: 26px minmax(0, 1fr);
+    grid-template-areas:
+      'index name'
+      '.     count';
+    gap: 3px 8px;
+  }
+
+  .rank-item__index { grid-area: index; font-size: 0.9rem; }
+  .rank-item__name { grid-area: name; font-size: 0.92rem; padding-bottom: 5px; }
+  .rank-item__count { grid-area: count; font-size: 0.78rem; }
+
+  /* ---- Trend ---- */
+  .trend__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .trend__num {
+    font-size: clamp(1.5rem, 7vw, 2rem);
+  }
+
+  .trend__meta {
+    font-size: 0.75rem;
+  }
+
+  .trend__bars {
+    height: 150px;
+    gap: 8px;
+  }
+
+  .tbar {
+    flex: 1 0 42px;
+    min-width: 42px;
+  }
+
+  /* ---- Footer ---- */
+  .site-foot {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-top: 36px;
+    padding-block: 24px 32px;
+  }
+
+  .site-foot__word {
+    font-size: 0.92rem;
+    letter-spacing: 0.16em;
   }
 }
 
 /* --------------------------------------------------------------------------
-   Coarse pointer — bigger hit targets, no hover-only affordances
+   ≤420px — small phone
+   -------------------------------------------------------------------------- */
+@media (max-width: 420px) {
+  .wrap {
+    padding-inline: 11px;
+  }
+
+  .brand__word {
+    font-size: 0.74rem;
+  }
+
+  .hero__word {
+    font-size: clamp(2rem, 12.5vw, 2.7rem);
+  }
+
+  .kpi__num {
+    font-size: clamp(1.25rem, 7vw, 1.55rem);
+  }
+
+  .kpi__label {
+    font-size: 0.7rem;
+  }
+
+  .activity-item__name {
+    font-size: 0.9rem;
+  }
+
+  /* Two columns is the floor — one column makes the strip taller than the
+     hero on a small screen and pushes the charts off the first screen. */
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Coarse pointer — no hover-only affordances
    -------------------------------------------------------------------------- */
 @media (hover: none) {
-  .kpi:hover {
+  .activity-item:hover {
     transform: none;
+    box-shadow: none;
   }
 
-  .heat__cell[data-v]:hover {
-    transform: none;
-    color: inherit;
+  .btn:active,
+  .dfilter__reset:active {
+    transform: translateY(1px);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Short landscape phones — the sticky header must not eat the viewport
+   -------------------------------------------------------------------------- */
+@media (max-height: 520px) and (orientation: landscape) {
+  .site-head {
+    position: static;
+  }
+
+  .splash__logo {
+    width: min(28vw, 140px);
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Print — drop the chrome, keep the numbers
+   -------------------------------------------------------------------------- */
+@media print {
+  .grain,
+  .bg-shape,
+  .splash,
+  .site-head,
+  .dfilter__busy {
+    display: none !important;
+  }
+
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .card,
+  .kpi,
+  .hero__panel,
+  .activity-item,
+  .rank-item {
+    break-inside: avoid;
+    box-shadow: none;
+  }
+
+  .site-head {
+    display: none !important;
   }
 }

@@ -1,7 +1,20 @@
 /**
  * ============================================================
-   FIRST STEP EVENTS — Registration Intelligence
-   js/dashboard.js — Main Controller
+    FIRST STEP EVENTS — Registration Intelligence
+    js/dashboard.js — Main Controller
+   ------------------------------------------------------------
+    v2 changes:
+      • Boot issues two requests in PARALLEL: `facets` (small, answers from the
+        Apps Script cache) paints the filter bar immediately, while `rows`
+        (large, may hit a cold start) streams in behind it. The dashboard
+        becomes interactive long before the dataset lands.
+      • Filter changes are debounced and rendered from an in-memory payload
+        memo, so no request and no recompute happens for a filter state that
+        was already visited.
+      • Stale-while-revalidate: a cached view paints instantly and refreshes
+        in the background instead of blocking on the network.
+      • List rendering uses DocumentFragment + one innerHTML write.
+      • Per-phase timings are logged under the "FSE perf" console group.
    ============================================================
  */
 
@@ -14,7 +27,11 @@
   }
 
   ready(function () {
-    if (API_CONFIG.DEMO_MODE) initDemoData();
+    var T0 = performance.now();
+    var marks = [];
+    function mark(label) {
+      marks.push(label + ' @ ' + Math.round(performance.now() - T0) + 'ms');
+    }
 
     var FILTER_LABELS = {
       event: 'كل الإيفنتات',
@@ -24,19 +41,6 @@
       status: 'كل الحالات',
       volunteer: 'كل الحالات',
       source: 'كل المصادر'
-    };
-
-    var CACHE_PREFIX = 'fse_dash_v1:';
-    var MAX_CACHED_VIEWS = 8;
-    var FRESH_MS = 60000;
-
-    var DATASET_KEY = 'fse_dash_rows_v1';
-    var DATASET_TTL_MS = 10 * 60 * 1000;
-
-    var DATASET_FETCH_OPTS = {
-      timeoutMs: API_CONFIG.DATASET_FETCH_TIMEOUT_MS,
-      allowJsonp: false,
-      retries: 1
     };
 
     var els = {
@@ -57,26 +61,23 @@
       trendPeak: Util.qs('#trendPeak'),
       trendBars: Util.qs('#trendBars'),
       footUpdated: Util.qs('#footUpdated'),
-      qualityScore: Util.qs('#qualityScore'),
-      qualityBar: Util.qs('#qualityBar'),
-      issueList: Util.qs('#issueList'),
 
       filterEvent: Util.qs('#dFilterEvent'),
       filterGov: Util.qs('#dFilterGov'),
-      filterUni: Util.qs('#dFilterUni'),
       filterGender: Util.qs('#dFilterGender'),
       filterStatus: Util.qs('#dFilterStatus'),
       filterVolunteer: Util.qs('#dFilterVolunteer'),
       filterSource: Util.qs('#dFilterSource'),
       filterReset: Util.qs('#dFilterReset'),
-      filterStatus: Util.qs('#dFilterStatus'),
+      filterHint: Util.qs('#dFilterHint'),
       filterBusy: Util.qs('#dFilterBusy')
     };
 
+    /* Drives the URL sync, the facet wiring and the debounced change handler.
+       Drop a key here and its <select> disappears from every path at once. */
     var FILTER_FIELDS = [
       { el: els.filterEvent, key: 'event', options: 'events' },
       { el: els.filterGov, key: 'governorate', options: 'governorates' },
-      { el: els.filterUni, key: 'university', options: 'universities' },
       { el: els.filterGender, key: 'gender', options: 'genders' },
       { el: els.filterStatus, key: 'status', options: 'statuses' },
       { el: els.filterVolunteer, key: 'volunteer', options: 'volunteers' },
@@ -84,47 +85,53 @@
     ];
 
     var state = {
-      payload: null,
       filters: readFiltersFromUrl(),
+      options: null,
       optionsReady: false,
-      generation: 0,
-      inFlight: {},
-      dataset: null
+      datasetReady: false,
+      payload: null,
+      serverFallback: false
     };
 
-    var bootPrefetch = hasActiveFilters()
-      ? null
-      : API.prefetch('rows', null, DATASET_FETCH_OPTS);
+    /* payload memo: filter key -> payload. Avoids recomputing a view twice. */
+    var memo = new Map();
+
+    /* ------------------------------------------------------------------
+       Filters <-> URL
+       ------------------------------------------------------------------ */
 
     function readFiltersFromUrl() {
       var params = new URLSearchParams(window.location.search);
       var out = {};
-      FILTER_FIELDS.forEach(function (f) {
-        out[f.key] = params.get(f.key) || '';
-      });
+      FILTER_FIELDS.forEach(function (f) { out[f.key] = params.get(f.key) || ''; });
       return out;
     }
 
     function syncUrl() {
       var params = new URLSearchParams();
       FILTER_FIELDS.forEach(function (f) {
-        var v = state.filters[f.key];
-        if (v) params.set(f.key, v);
+        if (state.filters[f.key]) params.set(f.key, state.filters[f.key]);
       });
       var qs = params.toString();
-      var url = window.location.pathname + (qs ? '?' + qs : '');
-      window.history.replaceState(null, '', url);
+      window.history.replaceState(null, '', window.location.pathname + (qs ? '?' + qs : ''));
     }
 
     function hasActiveFilters() {
       return FILTER_FIELDS.some(function (f) { return !!state.filters[f.key]; });
     }
 
-    function ensureFilterOptions(payload) {
-      if (state.optionsReady) return false;
+    function currentKey() {
+      return API.viewKey(state.filters);
+    }
 
-      var options = (payload && payload.options) || {};
-      if (!Object.keys(options).length) return false;
+    /* ------------------------------------------------------------------
+       Filter options
+       ------------------------------------------------------------------ */
+
+    function applyOptions(options) {
+      if (!options || !Object.keys(options).length) return false;
+
+      state.options = options;
 
       var changed = false;
 
@@ -132,22 +139,26 @@
         if (!f.el) return;
         var values = options[f.options] || [];
 
-        f.el.innerHTML = '';
-        f.el.appendChild(buildOption(f.key, ''));
-        values.forEach(function (v) {
-          f.el.appendChild(buildOption(f.key, v));
-        });
+        var group = document.createDocumentFragment();
+        group.appendChild(buildOption(f.key, ''));
+        values.forEach(function (v) { group.appendChild(buildOption(f.key, v)); });
 
+        f.el.textContent = '';
+        f.el.appendChild(group);
+
+        /* If the deep-linked value no longer exists, drop it silently. */
         var current = state.filters[f.key];
         if (current && values.indexOf(current) === -1) {
           state.filters[f.key] = '';
           changed = true;
         }
         f.el.value = state.filters[f.key] || '';
+        f.el.disabled = false;
       });
 
-      state.optionsReady = true;
       if (changed) syncUrl();
+      state.optionsReady = true;
+      mark('filter options');
       return changed;
     }
 
@@ -158,14 +169,19 @@
       return opt;
     }
 
-    function renderFilterStatus(payload) {
-      if (!els.filterStatus) return;
+    function primeEmptyFilters() {
+      FILTER_FIELDS.forEach(function (f) {
+        if (f.el) f.el.disabled = true;
+      });
+    }
 
-      els.filterStatus.classList.remove('is-stale');
+    function renderFilterStatus(payload) {
+      if (!els.filterHint) return;
+      els.filterHint.classList.remove('is-stale');
 
       if (!hasActiveFilters()) {
-        els.filterStatus.textContent = '';
-        els.filterStatus.classList.remove('is-active');
+        els.filterHint.textContent = '';
+        els.filterHint.classList.remove('is-active');
         return;
       }
 
@@ -177,10 +193,15 @@
         .map(function (f) { return state.filters[f.key]; })
         .join(' · ');
 
-      els.filterStatus.classList.add('is-active');
-      els.filterStatus.textContent = 'عرض ' + Util.fmtNumber(shown) + ' من ' + Util.fmtNumber(all) + ' تسجيل · ' + labels
-        + (state.dataset ? '' : ' · تحميل كل فلتر من السيرفر');
+      els.filterHint.classList.add('is-active');
+      els.filterHint.textContent = 'عرض ' + Util.fmtNumber(shown) + ' من ' + Util.fmtNumber(all)
+        + ' تسجيل · ' + labels
+        + (state.serverFallback ? ' · محسوب على السيرفر' : '');
     }
+
+    /* ------------------------------------------------------------------
+       States
+       ------------------------------------------------------------------ */
 
     function staggerReveal() {
       Util.qsa('.reveal').forEach(function (el, i) {
@@ -188,417 +209,173 @@
       });
     }
 
+    function showLoadingPlaceholders() {
+      ['heroTotal', 'heroUpdated', 'pulseDelta', 'pulseMeta', 'kpiTotal', 'kpiEvents', 'kpiGovernorates', 'kpiDays']
+        .forEach(function (id) { if (els[id]) els[id].textContent = 'جاري التحميل…'; });
+    }
+
     function showError() {
       Util.qsa('.reveal').forEach(function (el) { el.classList.add('is-error'); });
-      els.error.hidden = false;
+      if (els.error) els.error.hidden = false;
     }
 
     function hideError() {
-      els.error.hidden = true;
+      if (els.error) els.error.hidden = true;
       Util.qsa('.reveal').forEach(function (el) { el.classList.remove('is-error'); });
     }
 
-    function showStaleNotice() {
-      if (!els.filterStatus) return;
-      els.filterStatus.classList.add('is-stale');
-      els.filterStatus.textContent = 'تعذّر التحديث — الأرقام المعروضة محفوظة من آخر تحميل ناجح';
-    }
-
-    function viewKey(filters) {
-      return FILTER_FIELDS.map(function (f) { return filters[f.key] || ''; }).join('\u0001');
-    }
-
-    function readView(key) {
-      try {
-        var raw = window.localStorage.getItem(CACHE_PREFIX + key);
-        if (!raw) return null;
-        var rec = JSON.parse(raw);
-        if (!rec || !rec.payload || rec.payload.success !== true) return null;
-        return rec;
-      } catch (e) {
-        return null;
-      }
-    }
-
-    function isFresh(rec) {
-      return !!rec && typeof rec.at === 'number' && (Date.now() - rec.at) < FRESH_MS;
-    }
-
-    function writeView(key, payload) {
-      try {
-        window.localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({
-          at: Date.now(),
-          payload: payload
-        }));
-      } catch (e) { /* ignore */ }
-      pruneViews(key);
-    }
-
-    function pruneViews(keepKey) {
-      try {
-        var entries = [];
-        for (var i = 0; i < window.localStorage.length; i++) {
-          var k = window.localStorage.key(i);
-          if (!k || k.indexOf(CACHE_PREFIX) !== 0) continue;
-          var raw = window.localStorage.getItem(k);
-          var at = 0;
-          try { at = (JSON.parse(raw) || {}).at || 0; } catch (e) { at = 0; }
-          entries.push({ k: k, at: at });
-        }
-        entries.sort(function (a, b) { return b.at - a.at; });
-        for (var j = MAX_CACHED_VIEWS; j < entries.length; j++) {
-          if (entries[j].k === CACHE_PREFIX + keepKey) continue;
-          window.localStorage.removeItem(entries[j].k);
-        }
-      } catch (e) { /* ignore */ }
+    function showStaleNotice(message) {
+      if (!els.filterHint) return;
+      els.filterHint.classList.add('is-stale');
+      els.filterHint.textContent = message || 'تعذّر التحديث — الأرقام المعروضة محفوظة من آخر تحميل ناجح';
     }
 
     function setBusy(on) {
       if (els.filterBusy) els.filterBusy.hidden = !on;
     }
 
-    function loadDataset(prefetched) {
-      if (state.datasetPromise) return state.datasetPromise;
-
-      var stored = readDatasetCache();
-      if (stored) {
-        state.dataset = stored;
-        state.datasetPromise = Promise.resolve(stored);
-        return state.datasetPromise;
-      }
-
-      var pending = prefetched || API.get('rows', null, DATASET_FETCH_OPTS);
-      state.datasetPromise = pending.then(function (payload) {
-        if (API.isError(payload)) throw new Error(payload.error || 'API error');
-        if (!payload || !payload.rows || !payload.rows.length) {
-          throw new Error('empty row projection');
-        }
-        state.dataset = payload;
-        datasetRetries = 0;
-        writeDatasetCache(payload);
-        return payload;
-      }).catch(function (err) {
-        state.datasetPromise = null;
-        scheduleDatasetRetry();
-        throw err;
-      });
-
-      return state.datasetPromise;
-    }
-
-    var datasetRetries = 0;
-    var datasetRetryTimer = null;
-
-    function scheduleDatasetRetry() {
-      if (datasetRetryTimer || state.dataset) return;
-      if (datasetRetries >= 3) return;
-
-      datasetRetries++;
-      var wait = Math.min(5000 * datasetRetries, 20000);
-      datasetRetryTimer = setTimeout(function () {
-        datasetRetryTimer = null;
-        if (state.dataset) return;
-
-        loadDataset().then(function () {
-          applyLocalView(false);
-          renderFilterStatus(state.payload);
-        }).catch(function () {});
-      }, wait);
-    }
-
-    function readDatasetCache() {
-      try {
-        var raw = window.localStorage.getItem(DATASET_KEY);
-        if (!raw) return null;
-        var rec = JSON.parse(raw);
-        if (!rec || !rec.payload || !rec.payload.rows || !rec.payload.rows.length) return null;
-        if (typeof rec.at !== 'number' || (Date.now() - rec.at) > DATASET_TTL_MS) return null;
-        return rec.payload;
-      } catch (e) {
-        return null;
-      }
-    }
-
-    function writeDatasetCache(payload) {
-      try {
-        window.localStorage.setItem(DATASET_KEY, JSON.stringify({
-          at: Date.now(),
-          payload: payload
-        }));
-      } catch (e) { /* quota or private mode — the cache is optional */ }
-    }
-
-    function payloadFor(filters) {
-      return FilterEngine.buildPayload(state.dataset, filters || state.filters);
-    }
-
-    function applyLocalView(initial) {
-      var payload = payloadFor(state.filters);
-
-      Charts.setAnimation(!!initial);
-      state.payload = payload;
-      render(payload);
-      Charts.setAnimation(true);
-
-      document.body.classList.add('ready');
-      hideError();
-      painted();
-      return payload;
-    }
-
-    function requestView(initial, prefetched) {
-      var key = viewKey(state.filters);
-
-      if (state.inFlight[key]) return;
-      state.inFlight[key] = true;
-
-      var gen = ++state.generation;
-      setBusy(true);
-      Charts.setAnimation(!!initial);
-
-      var pending = prefetched || API.get('dashboard', state.filters);
-
-      pending.then(function (payload) {
-        delete state.inFlight[key];
-        if (gen !== state.generation) return;
-        if (API.isError(payload)) throw new Error(payload.error || 'API error');
-
-        state.payload = payload;
-        writeView(key, payload);
-        render(payload);
-        document.body.classList.add('ready');
-        hideError();
-        painted();
-      }).catch(function () {
-        delete state.inFlight[key];
-        if (gen !== state.generation) return;
-
-        var stale = readView(key);
-        if (stale) {
-          state.payload = stale.payload;
-          render(stale.payload);
-          document.body.classList.add('ready');
-          showStaleNotice();
-        } else {
-          showError();
-        }
-        painted();
-      }).then(function () {
-        if (gen !== state.generation) return;
-        setBusy(false);
-        Charts.setAnimation(true);
-      });
-    }
-
     function painted() {
-      if (Util && typeof Util.markDataReady === 'function') Util.markDataReady();
-      // Only hide splash if we have actual data
-      if (state.payload && state.payload.summary && state.payload.summary.totalRegistrations > 0) {
-        // markDataReady already handles splash hide
-      }
+      document.body.classList.add('ready');
+      Util.markDataReady();
     }
 
-    function load() {
-      hideError();
+    /* ------------------------------------------------------------------
+       Rendering
+       ------------------------------------------------------------------ */
 
-      var key = viewKey(state.filters);
-      var cached = readView(key);
-
-      if (cached && isFresh(cached)) {
-        Charts.setAnimation(false);
-        state.payload = cached.payload;
-        render(cached.payload);
-        document.body.classList.add('ready');
-        painted();
-        if (!state.dataset) loadDataset().catch(function () {});
-        renderFilterStatus(cached.payload);
-        return;
-      }
-
-      if (cached) {
-        Charts.setAnimation(false);
-        state.payload = cached.payload;
-        render(cached.payload);
-        document.body.classList.add('ready');
-        painted();
-      } else {
-        document.body.classList.remove('ready');
-        // Show loading state in KPIs
-        ['heroTotal', 'heroUpdated', 'pulseDelta', 'pulseMeta', 'kpiTotal', 'kpiEvents', 'kpiGovernorates', 'kpiDays'].forEach(function(id) {
-          if (els[id]) els[id].textContent = 'جاري التحميل…';
-        });
-      }
-
-      var prefetched = bootPrefetch;
-      bootPrefetch = null;
-
-      loadDataset(prefetched).then(function () {
-        var payload = applyLocalView(!cached);
-        writeView(viewKey(state.filters), payload);
-        renderFilterStatus(payload);
-      }).catch(function (err) {
-        // If dataset fails, try dashboard endpoint
-        console.warn('Dataset load failed, trying dashboard endpoint:', err);
-        requestView(!cached, null);
-      });
-    }
-
-    function applyFilter(key, value) {
-      state.filters[key] = value || '';
-      syncUrl();
-
-      if (state.dataset) {
-        var payload = applyLocalView(false);
-        writeView(viewKey(state.filters), payload);
-        renderFilterStatus(payload);
-        return;
-      }
-
-      var cached = readView(viewKey(state.filters));
-      if (cached) {
-        Charts.setAnimation(false);
-        state.payload = cached.payload;
-        render(cached.payload);
-        document.body.classList.add('ready');
-        hideError();
-        if (isFresh(cached)) {
-          Charts.setAnimation(true);
-          renderFilterStatus(cached.payload);
-          loadDataset().catch(function () {});
-          return;
-        }
-      }
-
-      loadDataset().then(function () {
-        var local = applyLocalView(false);
-        writeView(viewKey(state.filters), local);
-        renderFilterStatus(local);
-      }).catch(function () {
-        requestView(false);
-      });
-    }
-
-    function render(payload) {
+    function paint(payload, animate) {
       var summary = payload.summary || {};
       var total = summary.totalRegistrations || 0;
 
-      if (ensureFilterOptions(payload)) {
-        state.filters = readFiltersFromUrl();
-        FILTER_FIELDS.forEach(function (f) { if (f.el) f.el.value = ''; });
-        syncUrl();
-        requestView(false);
-        return;
-      }
+      Charts.setAnimation(!!animate);
 
       renderFilterStatus(payload);
 
-      // HERO
-      els.heroTotal.textContent = Util.fmtNumber(total);
-      els.heroUpdated.textContent = Util.formatSubmission(summary.lastSubmissionAt || payload.generatedAt);
+      /* HERO */
+      if (els.heroTotal) els.heroTotal.textContent = Util.fmtNumber(total);
+      if (els.heroUpdated) els.heroUpdated.textContent = Util.formatSubmission(summary.lastSubmissionAt || payload.generatedAt);
 
-      // PULSE + TREND
       var daily = payload.daily || [];
+
+      /* PULSE + TREND */
       renderPulse(daily);
       renderTrend(daily);
       Charts.daily('#dailyChart', daily);
 
-      // KPI STRIP
-      els.kpiTotal.textContent = Util.fmtNumber(total);
-      els.kpiEvents.textContent = Util.fmtNumber(summary.uniqueEvents || 0);
-      els.kpiGovernorates.textContent = Util.fmtNumber(summary.governorates || 0);
-      els.kpiDays.textContent = Util.fmtNumber(summary.activeDays || 0);
+      /* KPI STRIP */
+      if (els.kpiTotal) els.kpiTotal.textContent = Util.fmtNumber(total);
+      if (els.kpiEvents) els.kpiEvents.textContent = Util.fmtNumber(summary.uniqueEvents || 0);
+      if (els.kpiGovernorates) els.kpiGovernorates.textContent = Util.fmtNumber(summary.governorates || 0);
+      if (els.kpiDays) els.kpiDays.textContent = Util.fmtNumber(summary.activeDays || 0);
 
-      // EVENT INTELLIGENCE
+      /* EVENT INTELLIGENCE */
       renderEvents(payload.events || [], total);
       Charts.activity('#eventChart', payload.events || [], total);
 
-      // GEOGRAPHIC
+      /* GEOGRAPHIC */
       renderGovernorates(payload.governorates || [], total);
       Charts.governorates('#govChart', payload.governorates || [], total);
 
-      // PROFILE
+      /* PROFILE */
       Charts.gender('#genderChart', payload.genders || [], total);
       Charts.age('#ageChart', payload.ages || [], total);
       Charts.year('#yearChart', payload.years || [], total);
       Charts.college('#collegeChart', payload.colleges || [], total);
 
-      // QUALITY
-      renderQuality(payload.quality || {});
+      /* FOOT */
+      if (els.footUpdated) els.footUpdated.textContent = Util.formatSubmission(summary.lastSubmissionAt || payload.generatedAt);
 
-      // FOOT
-      els.footUpdated.textContent = Util.formatSubmission(summary.lastSubmissionAt || payload.generatedAt);
+      Charts.setAnimation(true);
     }
 
     function renderPulse(daily) {
+      if (!els.pulseDelta) return;
       var last = daily[daily.length - 1];
       var prev = daily[daily.length - 2];
+
       if (!last) {
         els.pulseDelta.textContent = '—';
-        els.pulseMeta.textContent = 'لا توجد بيانات يومية بعد';
+        if (els.pulseMeta) els.pulseMeta.textContent = 'لا توجد بيانات يومية بعد';
         return;
       }
 
       els.pulseDelta.textContent = Util.fmtNumber(last.count);
-      els.pulseMeta.textContent = 'تسجيل في ' + Util.formatDateLabel(last.date);
+      if (els.pulseMeta) els.pulseMeta.textContent = 'تسجيل في ' + Util.formatDateLabel(last.date);
 
-      if (prev && prev.count !== undefined) {
+      if (prev && els.pulseTrend) {
         var diff = last.count - prev.count;
-        var trend = els.pulseTrend;
-        if (trend) {
-          trend.textContent = (diff >= 0 ? '▲ +' : '▼ ') + diff;
-          trend.className = 'pulse__trend ' + (diff >= 0 ? 'is-up' : 'is-down');
-        }
+        els.pulseTrend.textContent = (diff >= 0 ? '▲ +' : '▼ ') + diff;
+        els.pulseTrend.className = 'pulse__trend ' + (diff >= 0 ? 'is-up' : 'is-down');
       }
     }
 
     function renderTrend(daily) {
+      if (!els.trendBars) return;
+
       if (!daily.length) {
-        els.trendAverage.textContent = '—';
-        els.trendPeak.textContent = '—';
+        if (els.trendAverage) els.trendAverage.textContent = '—';
+        if (els.trendPeak) els.trendPeak.textContent = '—';
+        els.trendBars.textContent = '';
         return;
       }
 
       var sum = 0;
       var peak = daily[0];
+      for (var i = 0; i < daily.length; i++) {
+        sum += daily[i].count;
+        if (daily[i].count > peak.count) peak = daily[i];
+      }
+
+      if (els.trendAverage) els.trendAverage.textContent = Math.round(sum / daily.length);
+      if (els.trendPeak) {
+        els.trendPeak.textContent = peak.count;
+        els.trendPeak.setAttribute('data-hint', Util.formatDateLabel(peak.date));
+        els.trendPeak.title = Util.formatDateLabel(peak.date);
+      }
+
+      var max = peak.count || 1;
+      var frag = document.createDocumentFragment();
+
+      /* Past this many active days the per-bar number no longer has room, so
+         it is dropped from the drawing (it stays in the aria-label) and the
+         row scrolls sideways instead of squashing the columns together. */
+      var dense = daily.length > 14;
+      els.trendBars.classList.toggle('trend__bars--dense', dense);
+
       daily.forEach(function (d) {
-        sum += d.count;
-        if (d.count > peak.count) peak = d;
-      });
-
-      els.trendAverage.textContent = Math.round(sum / daily.length);
-      els.trendPeak.textContent = peak.count;
-      els.trendPeak.setAttribute('data-hint', Util.formatDateLabel(peak.date));
-      els.trendPeak.title = Util.formatDateLabel(peak.date);
-
-      var max = Math.max.apply(null, daily.map(function (d) { return d.count; })) || 1;
-      els.trendBars.innerHTML = '';
-
-      daily.forEach(function (d, i) {
         var col = Util.createEl('div', 'tbar' + (d.count === max && max > 0 ? ' tbar--peak' : ''));
         col.style.setProperty('--h', Math.max(8, Math.round((d.count / max) * 100)) + '%');
 
         var num = Util.createEl('span', 'tbar__num', Util.fmtNumber(d.count));
         num.setAttribute('aria-hidden', 'true');
-
-        var bar = Util.createEl('span', 'tbar__bar');
-        var label = Util.createEl('span', 'tbar__label', Util.formatDateLabel(d.date));
-
         col.appendChild(num);
-        col.appendChild(bar);
-        col.appendChild(label);
+        col.appendChild(Util.createEl('span', 'tbar__bar'));
+        col.appendChild(Util.createEl('span', 'tbar__label', Util.formatDateLabel(d.date)));
         col.setAttribute('aria-label', Util.fmtNumber(d.count) + ' تسجيل في ' + Util.formatDateLabel(d.date));
-        els.trendBars.appendChild(col);
+
+        frag.appendChild(col);
       });
+
+      els.trendBars.textContent = '';
+      els.trendBars.appendChild(frag);
+
+      /* Always start the scroller at the newest day (the left edge in RTL). */
+      var scroller = els.trendBars.parentNode;
+      if (scroller && scroller.scrollWidth > scroller.clientWidth) {
+        scroller.scrollLeft = scroller.scrollWidth;
+      }
     }
 
     function renderEvents(events, total) {
-      els.eventList.innerHTML = '';
+      if (!els.eventList) return;
 
       if (!events.length) {
-        var empty = Util.createEl('li', 'empty-note', 'لا توجد بيانات عن الإيفنتات بعد.');
-        els.eventList.appendChild(empty);
+        els.eventList.textContent = '';
+        els.eventList.appendChild(Util.createEl('li', 'empty-note', 'لا توجد بيانات عن الإيفنتات بعد.'));
         return;
       }
+
+      var frag = document.createDocumentFragment();
 
       events.forEach(function (ev, i) {
         var li = Util.createEl('li', 'activity-item');
@@ -607,104 +384,251 @@
         li.setAttribute('aria-label', 'عرض تسجيلات: ' + ev.name);
         li.style.setProperty('--w', Math.min(100, ev.percentage || 0) + '%');
 
-        var index = Util.createEl('span', 'activity-item__index', String(i + 1).padStart(2, '0'));
-        var body = Util.createEl('div', 'activity-item__body');
-        var name = Util.createEl('h3', 'activity-item__name', ev.name);
-        var meta = Util.createEl('p', 'activity-item__meta', ev.digest || '');
+        li.appendChild(Util.createEl('span', 'activity-item__index', String(i + 1).padStart(2, '0')));
 
-        body.appendChild(name);
-        body.appendChild(meta);
+        var body = Util.createEl('div', 'activity-item__body');
+        body.appendChild(Util.createEl('h3', 'activity-item__name', ev.name));
+        body.appendChild(Util.createEl('p', 'activity-item__meta', ev.digest || ''));
+        li.appendChild(body);
 
         var count = Util.createEl('div', 'activity-item__count');
-        var num = Util.createEl('span', 'activity-item__num', Util.fmtNumber(ev.count));
-        var pct = Util.createEl('span', 'activity-item__pct', Util.pct(ev.count, total));
-        count.appendChild(num);
-        count.appendChild(pct);
-
-        li.appendChild(index);
-        li.appendChild(body);
+        count.appendChild(Util.createEl('span', 'activity-item__num', Util.fmtNumber(ev.count)));
+        count.appendChild(Util.createEl('span', 'activity-item__pct', Util.pct(ev.count, total)));
         li.appendChild(count);
 
-        li.addEventListener('click', function () { openEvent(ev.name); });
+        var open = function () { applyFilter('event', ev.name); };
+        li.addEventListener('click', open);
         li.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEvent(ev.name); }
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); }
         });
 
-        els.eventList.appendChild(li);
+        frag.appendChild(li);
       });
+
+      els.eventList.textContent = '';
+      els.eventList.appendChild(frag);
     }
 
     function renderGovernorates(governorates, total) {
-      els.govList.innerHTML = '';
+      if (!els.govList) return;
 
       if (!governorates.length) {
-        var empty = Util.createEl('li', 'empty-note', 'لا توجد بيانات عن المحافظات بعد.');
-        els.govList.appendChild(empty);
+        els.govList.textContent = '';
+        els.govList.appendChild(Util.createEl('li', 'empty-note', 'لا توجد بيانات عن المحافظات بعد.'));
         return;
       }
+
+      var frag = document.createDocumentFragment();
 
       governorates.forEach(function (g, i) {
         var li = Util.createEl('li', 'rank-item');
         li.style.setProperty('--w', Math.min(100, g.percentage || 0) + '%');
 
-        var idx = Util.createEl('span', 'rank-item__index', String(i + 1).padStart(2, '0'));
+        li.appendChild(Util.createEl('span', 'rank-item__index', String(i + 1).padStart(2, '0')));
+
         var name = Util.createEl('span', 'rank-item__name', g.name);
-        var bar = Util.createEl('span', 'rank-item__bar');
-        var count = Util.createEl('span', 'rank-item__count', Util.fmtNumber(g.count) + ' · ' + Util.pct(g.count, total));
-
-        name.appendChild(bar);
-        li.appendChild(idx);
+        name.appendChild(Util.createEl('span', 'rank-item__bar'));
         li.appendChild(name);
-        li.appendChild(count);
 
-        els.govList.appendChild(li);
+        li.appendChild(Util.createEl('span', 'rank-item__count', Util.fmtNumber(g.count) + ' · ' + Util.pct(g.count, total)));
+
+        frag.appendChild(li);
+      });
+
+      els.govList.textContent = '';
+      els.govList.appendChild(frag);
+    }
+
+    /* ------------------------------------------------------------------
+       Data sources
+       ------------------------------------------------------------------ */
+
+    /** Local path: dataset in memory -> recompute locally (instant). */
+    function localPayload() {
+      var t = performance.now();
+      var ds = API.getDatasetSync();
+      var payload = FilterEngine.buildPayload(ds, state.filters);
+      payload._computeMs = Math.round(performance.now() - t);
+      return payload;
+    }
+
+    /** Server path: pre-aggregated payload (used only if rows are missing). */
+    function serverPayload() {
+      setBusy(true);
+      return API.get('dashboard', state.filters, { allowJsonp: true, retries: 1 })
+        .then(function (payload) {
+          state.serverFallback = true;
+          return payload;
+        });
+    }
+
+    function usePayload(payload, animate, cacheIt) {
+      state.payload = payload;
+      if (cacheIt) {
+        API.writeView(currentKey(), payload);
+        memo.set(currentKey(), payload);
+      }
+      paint(payload, animate);
+      painted();
+      hideError();
+      setBusy(false);
+    }
+
+    /**
+     * Renders the current filter state from the best available source:
+     *   memo -> local dataset -> server aggregation.
+     * Falls back to a stale cached view if everything fails.
+     */
+    function renderCurrent(opts) {
+      opts = opts || {};
+      var key = currentKey();
+
+      /* 1. memoized payload for this exact filter state */
+      if (memo.has(key)) {
+        usePayload(memo.get(key), false, false);
+        return Promise.resolve(state.payload);
+      }
+
+      /* 2. dataset available -> compute locally, no network at all */
+      if (API.hasDataset()) {
+        state.serverFallback = false;
+        var payload = localPayload();
+        usePayload(payload, opts.animate !== false, true);
+        return Promise.resolve(payload);
+      }
+
+      /* 3. try the localStorage view cache first (may be stale but instant) */
+      var cached = API.readView(key);
+      if (cached && opts.preferCache) {
+        state.payload = cached.payload;
+        paint(cached.payload, false);
+        painted();
+        hideError();
+      }
+
+      /* 4. server-side aggregation */
+      return serverPayload().then(function (remote) {
+        if (opts.preferCache && cached) {
+          API.writeView(key, remote);
+          memo.set(key, remote);
+          paint(remote, false);
+          painted();
+          return remote;
+        }
+        usePayload(remote, opts.animate !== false, true);
+        return remote;
+      }).catch(function (err) {
+        if (cached) {
+          state.payload = cached.payload;
+          paint(cached.payload, false);
+          painted();
+          showStaleNotice();
+          setBusy(false);
+          return cached.payload;
+        }
+        showError();
+        setBusy(false);
+        throw err;
       });
     }
 
-    function renderQuality(quality) {
-      var score = quality.score || 0;
-      els.qualityScore.textContent = Math.round(score);
-      if (els.qualityBar) {
-        els.qualityBar.style.setProperty('--w', score + '%');
-        els.qualityBar.setAttribute('aria-valuenow', score);
+    /* ------------------------------------------------------------------
+       Boot
+       ------------------------------------------------------------------ */
+
+    function boot() {
+      hideError();
+      memo.clear();
+      FilterEngine.reset();
+
+      /* Normalise the URL on load: drops params for filters that no longer
+         exist (?university=…) and anything unknown, so a stale shared link
+         does not keep dead query params forever. */
+      syncUrl();
+
+      var key = currentKey();
+      var cached = API.readView(key);
+
+      /* Stale-while-revalidate: paint what we have, refresh behind it. */
+      if (cached) {
+        state.payload = cached.payload;
+        paint(cached.payload, false);
+        painted();
+        renderFilterStatus(cached.payload);
+        mark('cached paint');
+      } else {
+        document.body.classList.remove('ready');
+        showLoadingPlaceholders();
       }
 
-      var issues = quality.issues || [];
-      els.issueList.innerHTML = '';
+      /* Two requests in parallel: small/fast facets + large/slow rows. */
+      var facetsPromise = API.get('facets', null, {
+        timeoutMs: API_CONFIG.FACETS_TIMEOUT_MS,
+        allowJsonp: true,
+        retries: 1
+      }).then(function (payload) {
+        if (payload && payload.options) {
+          if (applyOptions(payload.options)) {
+            /* a deep-linked filter was invalid — re-render with clean filters */
+            renderCurrent({ animate: false });
+          }
+        }
+        mark('facets');
+      }).catch(function () {
+        mark('facets failed');
+      });
 
-      if (!issues.length) {
-        var empty = Util.createEl('li', 'empty-note', 'لا توجد مشاكل في البيانات — جودة ممتازة');
-        els.issueList.appendChild(empty);
+      var rowsPromise = API.getDataset().then(function (ds) {
+        state.datasetReady = true;
+        mark('rows (' + ds.rows.length + ')');
+        return renderCurrent({ animate: !cached });
+      }).catch(function (err) {
+        mark('rows failed');
+        console.warn('[FSE] dataset unavailable, using server aggregation:', err && err.message);
+        return renderCurrent({ animate: !cached, preferCache: !!cached }).catch(function () {});
+      });
+
+      Promise.all([facetsPromise, rowsPromise]).then(function () {
+        mark('boot complete');
+        if (window.console && console.groupCollapsed) {
+          console.groupCollapsed('FSE perf');
+          marks.forEach(function (m) { console.log(m); });
+          console.groupEnd();
+        }
+      });
+    }
+
+    /* ------------------------------------------------------------------
+       Filter interaction
+       ------------------------------------------------------------------ */
+
+    var applyFilter = Util.debounce(function (key2, value) {
+      state.filters[key2] = value || '';
+
+      /* keep every <select> in sync — also covers programmatic clicks
+         (clicking an event row sets the event filter for you) */
+      FILTER_FIELDS.forEach(function (f) {
+        if (f.el) f.el.value = state.filters[f.key] || '';
+      });
+
+      syncUrl();
+
+      if (API.hasDataset()) {
+        state.serverFallback = false;
+        renderCurrent({ animate: false });
         return;
       }
 
-      issues.forEach(function (i) {
-        var li = Util.createEl('li', 'issue-item');
-        var name = Util.createEl('span', 'issue-item__name', i.label);
-        var count = Util.createEl('span', 'issue-item__count', Util.fmtNumber(i.count));
-        var pct = Util.createEl('span', 'issue-item__pct', Util.pct(i.count, quality.total || 1));
-        li.appendChild(name);
-        li.appendChild(count);
-        li.appendChild(pct);
-        els.issueList.appendChild(li);
+      setBusy(true);
+      renderCurrent({ animate: false, preferCache: true }).catch(function () {
+        setBusy(false);
       });
-    }
-
-    function openEvent(eventName) {
-      var params = new URLSearchParams();
-      FILTER_FIELDS.forEach(function (f) {
-        if (state.filters[f.key]) params.set(f.key, state.filters[f.key]);
-      });
-      params.set('event', eventName);
-      window.location.href = 'event.html?' + params.toString();
-    }
+    }, API_CONFIG.FILTER_DEBOUNCE_MS);
 
     FILTER_FIELDS.forEach(function (f) {
       if (!f.el) return;
       f.el.value = state.filters[f.key] || '';
-      f.el.addEventListener('change', function () {
-        applyFilter(f.key, f.el.value);
-      });
+      f.el.addEventListener('change', function () { applyFilter(f.key, f.el.value); });
     });
 
     if (els.filterReset) {
@@ -715,33 +639,25 @@
           if (f.el) f.el.value = '';
         });
         syncUrl();
-        var cached = readView(viewKey(state.filters));
-        if (cached) {
-          Charts.setAnimation(false);
-          state.payload = cached.payload;
-          render(cached.payload);
-          document.body.classList.add('ready');
-          hideError();
-        }
-        requestView(false);
+        renderCurrent({ animate: false, preferCache: true }).catch(function () {});
       });
     }
 
-    els.retry.addEventListener('click', load);
+    if (els.retry) els.retry.addEventListener('click', boot);
 
     staggerReveal();
+    primeEmptyFilters();
 
     Util.qsa('a[href^="#"]').forEach(function (a) {
       a.addEventListener('click', function (e) {
         var id = a.getAttribute('href').slice(1);
         var target = document.getElementById(id);
-        if (target) {
-          e.preventDefault();
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
+        if (!target) return;
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     });
 
-    load();
+    boot();
   });
 })();

@@ -491,6 +491,10 @@ body.ready .reveal {
   padding: clamp(16px, 2.5vw, 26px);
 }
 
+/* ---------- CHART HEIGHTS ----------
+   Fluid rather than hard-coded so a phone never gets a 460px-tall card that
+   fits three labels on screen. The media queries in responsive.css tighten
+   these further. */
 .chart-card {
   min-height: 260px;
 }
@@ -506,8 +510,7 @@ body.ready .reveal {
 }
 
 .chart-wrap--donut {
-  height: 360px;
-  min-height: 360px;
+  min-height: 340px;
 }
 
 .card__title {
@@ -576,8 +579,7 @@ body.ready .reveal {
 .intel,
 .geo,
 .trend,
-.profile,
-.quality {
+.profile {
   margin-bottom: clamp(44px, 8vh, 88px);
 }
 
@@ -591,9 +593,7 @@ body.ready .reveal {
 
 .intel__grid .chart-card,
 .geo__grid .chart-card {
-  height: 440px;
-  min-height: 300px;
-  max-height: 440px;
+  height: clamp(300px, 34vw, 440px);
 }
 
 .activity-list {
@@ -723,6 +723,10 @@ body.ready .reveal {
 }
 
 /* ---------- TREND ---------- */
+/* ---------- TREND ----------
+   The bars sit in a horizontal scroller with a per-bar minimum width. Without
+   it, 11+ day-columns squeeze into a phone viewport and the value on top of
+   each bar overlaps its neighbour. */
 .trend__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 0.6fr)) minmax(0, 1.8fr);
@@ -740,7 +744,7 @@ body.ready .reveal {
   font-weight: 900;
   color: var(--blue);
   line-height: 1;
-  font-variant-numeric: tabular-nums.
+  font-variant-numeric: tabular-nums;
 }
 
 .trend__meta {
@@ -749,29 +753,40 @@ body.ready .reveal {
   margin-top: 6px;
 }
 
+.trend__bars-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding-bottom: 4px;
+}
+
 .trend__bars {
   display: flex;
   align-items: flex-end;
   gap: clamp(8px, 2vw, 18px);
   height: 190px;
   padding-top: 18px;
+  min-width: min-content;
 }
 
 .tbar {
-  flex: 1;
+  flex: 1 0 46px;
+  min-width: 46px;
+  max-width: 96px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
   height: 100%;
   justify-content: flex-end;
-  min-width: 0;
 }
 
 .tbar__num {
   font-size: 0.78rem;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .tbar__bar {
@@ -792,7 +807,13 @@ body.ready .reveal {
   white-space: nowrap;
 }
 
-/* ---------- PROFILE (donut charts) ---------- */
+/* Densest mode (many active days): the numbers live in the aria-label and the
+   tooltip instead, so nothing is drawn on top of anything else. */
+.trend__bars--dense .tbar__num {
+  display: none;
+}
+
+/* ---------- PROFILE (donut / bar charts) ---------- */
 .profile__grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -801,88 +822,7 @@ body.ready .reveal {
 }
 
 .profile__grid .card.chart-card {
-  height: 460px;
-  min-height: 460px;
-  max-height: 460px;
-}
-
-/* ---------- QUALITY ---------- */
-.quality__grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: clamp(16px, 3vw, 30px);
-  align-items: start;
-}
-
-.quality__score {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.quality__num {
-  font-size: clamp(3rem, 6vw, 4.5rem);
-  font-weight: 900;
-  color: var(--blue);
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.quality__label {
-  font-size: 1.2rem;
-  font-weight: 700;
-  color: var(--blue);
-}
-
-.quality__bar {
-  height: 10px;
-  background: var(--line-soft);
-  border-radius: 5px;
-  overflow: hidden;
-}
-
-.quality__bar::before {
-  content: "";
-  display: block;
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, var(--blue), var(--blue-soft));
-  transition: width 0.6s var(--ease);
-}
-
-.issue-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.issue-item {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 12px;
-  background: var(--white);
-  border: 1px solid var(--line-soft);
-  border-radius: var(--radius);
-}
-
-.issue-item__name {
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.issue-item__count {
-  font-family: 'Alexandria', Tahoma, sans-serif;
-  font-variant-numeric: tabular-nums;
-  font-weight: 700;
-  color: var(--blue);
-}
-
-.issue-item__pct {
-  color: var(--muted);
-  font-size: 0.85rem;
+  height: clamp(340px, 32vw, 440px);
 }
 
 /* ---------- SKELETONS ---------- */

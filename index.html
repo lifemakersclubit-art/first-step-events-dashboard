@@ -46,7 +46,6 @@
       <a href="#speed">سرعة التسجيل</a>
       <a href="#geo">الجغرافيا</a>
       <a href="#audience">الجمهور</a>
-      <a href="#quality">جودة البيانات</a>
     </nav>
   </header>
 
@@ -113,13 +112,6 @@
         </div>
 
         <div class="dfilter__field">
-          <label for="dFilterUni">الجامعة</label>
-          <select id="dFilterUni" class="dfilter__select input">
-            <option value="">كل الجامعات</option>
-          </select>
-        </div>
-
-        <div class="dfilter__field">
           <label for="dFilterGender">النوع</label>
           <select id="dFilterGender" class="dfilter__select input">
             <option value="">كل الأنواع</option>
@@ -152,7 +144,7 @@
         </div>
       </div>
 
-      <p class="dfilter__status" id="dFilterStatus" role="status" aria-live="polite"></p>
+      <p class="dfilter__status" id="dFilterHint" role="status" aria-live="polite"></p>
     </section>
 
     <!-- ============ ABOUT (Board summary) ============ -->
@@ -164,7 +156,6 @@
         <li>ترتب الإيفنتات حسب الطلب والسرعة</li>
         <li>تبين التوزيع الجغرافي للمشاركين</li>
         <li>تحلل الجمهور: النوع، السن، السنة الدراسية، الكلية</li>
-        <li>تفحص جودة البيانات ونسب الاكتمال</li>
         <li>تعمل على أي جهاز (موبايل أو كمبيوتر) بدون تثبيت</li>
       </ul>
     </section>
@@ -275,8 +266,10 @@
           <span class="trend__num" id="trendPeak">—</span>
           <span class="trend__meta">أعلى يوم تسجيل</span>
         </div>
-        <div class="trend__bars" id="trendBars" aria-label="التسجيلات اليومية">
-          <span class="trend-bars__skeleton"></span>
+        <div class="trend__bars-scroll">
+          <div class="trend__bars" id="trendBars" aria-label="التسجيلات اليومية">
+            <span class="trend-bars__skeleton"></span>
+          </div>
         </div>
       </div>
     </section>
@@ -317,7 +310,9 @@
       </div>
     </section>
 
-    <!-- ============ DATA QUALITY ============ -->
+    <!-- ============ DATA QUALITY ============
+         Removed by request. The quality metrics are still computed and served
+         by the API (?action=dashboard -> .quality) if they are ever needed.
     <section class="quality reveal" id="quality" aria-labelledby="qualityTitle">
       <header class="section-head">
         <p class="section-kicker">جودة البيانات</p>
@@ -340,6 +335,7 @@
         </div>
       </div>
     </section>
+    -->
 
     <footer class="site-foot">
       <div>
